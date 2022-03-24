@@ -1,3 +1,5 @@
+import math
+
 import pytest
 import numpy as np
 
@@ -119,3 +121,30 @@ def test_linspace_photometer():
 
     with pytest.raises(ValueError, match='negative'):
         utils.linspace_photometer(10, -0.125)
+
+
+def test_ave_std(recwarn):
+    a, s = utils.ave_std(np.array([]))
+    assert math.isnan(a)
+    assert math.isnan(s)
+
+    a, s = utils.ave_std(np.array([1.23]))
+    assert a == 1.23
+    assert math.isnan(s)
+
+    a, s = utils.ave_std(np.array(range(10)))
+    assert a == 4.5
+    assert s == pytest.approx(3.0276503540975)
+
+    a, s = utils.ave_std(np.array([[1, 2], [3, 4], [5, 6]]), axis=1)
+    assert np.array_equal(a, [1.5, 3.5, 5.5])
+    assert len(s) == 3
+    assert s[0] == pytest.approx(0.70710678)
+    assert s[1] == pytest.approx(0.70710678)
+    assert s[2] == pytest.approx(0.70710678)
+
+    a, s = utils.ave_std(np.array([[1, 2], [3, 4], [5, 6]]), axis=0)
+    assert np.array_equal(a, [3., 4.])
+    assert np.array_equal(s, [2., 2.])
+
+    assert len(recwarn) == 0
