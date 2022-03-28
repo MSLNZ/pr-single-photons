@@ -321,7 +321,10 @@ class ScatterPlot(QtWidgets.QWidget):
         x_text, y_text = self._x_combobox.currentText(), self._y_combobox.currentText()
         self._x_combobox.clear()
         self._y_combobox.clear()
-        names = [name for name, typ in dataset.dtype.fields.items() if typ[0].kind in 'iuf']
+        if dataset.dtype.fields is not None:
+            names = [name for name, typ in dataset.dtype.fields.items() if typ[0].kind in 'iuf']
+        else:
+            names = []
         self._x_combobox.blockSignals(True)
         self._x_combobox.addItems(names)
         if x_text in names:
