@@ -216,6 +216,7 @@ class LogTable(Table):
     def __init__(self, log_dataset, title):
         super(LogTable, self).__init__(rows=log_dataset.size, header=log_dataset.dtype.names)
         colors = {
+            'NOTSET': convert.to_qcolor('white'),
             'DEBUG': convert.to_qcolor('lightslategrey'),
             'INFO': convert.to_qcolor('black'),
             'WARNING': convert.to_qcolor('darkgoldenrod'),
@@ -224,7 +225,7 @@ class LogTable(Table):
         }
         self.setWindowTitle(title)
         for row, values in enumerate(log_dataset):
-            color = colors[values['levelname']]
+            color = colors[values['levelname'] or 'NOTSET']
             for col, val in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(val)
                 item.setForeground(color)
