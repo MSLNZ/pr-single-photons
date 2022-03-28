@@ -339,11 +339,26 @@ class ScatterPlot(QtWidgets.QWidget):
 
     def redraw(self, *ignore):
         x_text, y_text = self._x_combobox.currentText(), self._y_combobox.currentText()
-        if not x_text or not y_text:
+        if self._dataset.size == 0:
             return
 
-        x = self._dataset[x_text] * self._x_scaling.value()
-        y = self._dataset[y_text] * self._y_scaling.value()
+        if x_text and y_text:
+            x = self._dataset[x_text]
+            y = self._dataset[y_text]
+        elif self._dataset.ndim == 1:
+            x = np.arange(self._dataset.size, dtype=float)
+            y = self._dataset[:]
+        elif self._dataset.shape[0] == 2:
+            x = self._dataset[0, :]
+            y = self._dataset[1, :]
+        elif self._dataset.shape[1] == 2:
+            x = self._dataset[:, 0]
+            y = self._dataset[:, 1]
+        else:
+            raise ValueError(f'Invalid Dataset with shape {self._dataset.shape}')
+
+        x *= self._x_scaling.value()
+        y *= self._y_scaling.value()
 
         if self._y_range_checkbox.isChecked():
             indices = np.logical_and(self._y_minimum.value() <= y, y <= self._y_maximum.value())
