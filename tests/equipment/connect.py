@@ -25,7 +25,7 @@ def device(alias, message):
     """
     app = App(r'D:\config.xml')
     dev = app.connect_equipment(alias)
-    if not prompt.yes_no(f'{message}\n\n{dev}'):
+    if not prompt.yes_no(f'{message}\n\n{dev.record!r}'):
         app.disconnect_equipment()
         sys.exit()
     return app, dev
