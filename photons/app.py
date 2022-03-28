@@ -461,7 +461,7 @@ class App(QtCore.QObject):
 
         Parameters
         ----------
-        file : :class:`str`, optional
+        file : :class:`str` or :class:`~msl.io.base_io.Root`, optional
             A file to read data from. If not specified an emtpy widget is returned.
         block : :class:`bool`, optional
             Whether to block until the application is closed.
