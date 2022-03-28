@@ -1,11 +1,9 @@
 """
 Control an electronic shutter controller from Melles Griot.
 """
-from nidaqmx import Task
-from nidaqmx.constants import LineGrouping
-
-from .shutter import Shutter
 from . import equipment
+from .shutter import Shutter
+from .nidaq import NIDAQ
 
 
 @equipment(manufacturer=r'Melles Griot', model=r'S25120A')
@@ -26,25 +24,25 @@ class S25120AShutter(Shutter):
             Whether to simulate a connection to the equipment by opening
             a connection in demo mode.
         """
-        self._is_open = None
-
-        # the parent class calls close() so self._lines must be defined before calling super()
-        dev = record.connection.address
-        port = record.connection.properties['port']
-        line = record.connection.properties['line']
-        self._lines = f'{dev}/port{port}/line{line}'
-
+        self._daq_port = record.connection.properties['port']
+        if self._daq_port is None:
+            raise ValueError(
+                'You must define the DAQ "port" number '
+                'as a ConnectionRecord.properties attribute, e.g. port=1'
+            )
+        self._daq_line = record.connection.properties['line']
+        if self._daq_line is None:
+            raise ValueError(
+                'You must define the DAQ "line" number '
+                'as a ConnectionRecord.properties attribute, e.g., line=1'
+            )
+        self._daq = NIDAQ(app, record, demo=demo)
         super(S25120AShutter, self).__init__(app, record, demo=demo)
 
     def close(self) -> None:
         """Close the shutter."""
-        self._digital_out(False)
+        self._daq.digital_out(False, self._daq_port, self._daq_line)
         self._log_and_emit_closed()
-
-    def open(self) -> None:
-        """Open the shutter."""
-        self._digital_out(True)
-        self._log_and_emit_opened()
 
     def is_open(self) -> bool:
         """Query whether the shutter is open.
@@ -54,17 +52,9 @@ class S25120AShutter(Shutter):
         :class:`bool`
             :data:`True` if the shutter is open, :data:`False` otherwise.
         """
-        return self._is_open
+        return self._daq.digital_out_read(self._daq_port, self._daq_line)
 
-    def _digital_out(self, state: bool) -> None:
-        """Create the Task to either output 0 or 5 volts from a digital channel.
-
-        Parameters
-        ----------
-        state : :class:`bool`
-            Whether to open (:data:`True`) or close (:data:`False`) the shutter.
-        """
-        with Task() as task:
-            task.do_channels.add_do_chan(self._lines, line_grouping=LineGrouping.CHAN_FOR_ALL_LINES)
-            task.write(state)
-            self._is_open = task.read()
+    def open(self) -> None:
+        """Open the shutter."""
+        self._daq.digital_out(True, self._daq_port, self._daq_line)
+        self._log_and_emit_opened()
