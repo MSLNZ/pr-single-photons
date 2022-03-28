@@ -29,10 +29,9 @@ class Shutter(BaseEquipment):
         # available when starting the BaseEquipment as a Service
         self.ignore_attributes(['state_changed'])
 
-        # the shutter that is attached to the controller, shutter=model[serial]
+        # the shutter that is attached to the controller
+        # use the following format in ConnectionRecord.properties shutter=model[serial]
         self.shutter_name = record.connection.properties.get('shutter')
-
-        self.close()
 
     def close(self) -> None:
         """Close the shutter."""
@@ -43,7 +42,7 @@ class Shutter(BaseEquipment):
         raise NotImplementedError
 
     def is_open(self) -> bool:
-        """Query whether the shutter is open."""
+        """Query whether the shutter is open or closed."""
         raise NotImplementedError
 
     def _log_and_emit_opened(self):
