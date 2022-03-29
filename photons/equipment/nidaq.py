@@ -113,7 +113,7 @@ class NIDAQ(BaseEquipment):
         if duration is not None:
             nsamples = round(duration * rate)
 
-        ai = f'{self.DEV}/ai{channel}'
+        ai = f'/{self.DEV}/ai{channel}'
         with self.Task() as task:
             task.ai_channels.add_ai_voltage_chan(
                 ai,
@@ -168,7 +168,7 @@ class NIDAQ(BaseEquipment):
         if max_val == min_val:
             max_val += 0.1
 
-        ao = f'{self.DEV}/ao{channel}'
+        ao = f'/{self.DEV}/ao{channel}'
         with self.Task() as task:
             task.ao_channels.add_ao_voltage_chan(ao, min_val=min_val, max_val=max_val)
 
@@ -296,7 +296,7 @@ class NIDAQ(BaseEquipment):
         >>> digital_in(1, '0:7')
         [False, False, True, False, False, False, False, True]
         """
-        lines = f'{self.DEV}/port{port}/line{line}'
+        lines = f'/{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
             task.di_channels.add_di_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             return task.read()
@@ -327,7 +327,7 @@ class NIDAQ(BaseEquipment):
         Set the state of multiple digital output channels
         >>> digital_out([False, True, True], 1, '2:4')
         """
-        lines = f'{self.DEV}/port{port}/line{line}'
+        lines = f'/{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
             task.do_channels.add_do_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             num_channels = len(task.channels.channel_names)
@@ -364,7 +364,7 @@ class NIDAQ(BaseEquipment):
         >>> digital_out_read(1, '0:7')
         [False, True, True, False, True, False, False, False]
         """
-        lines = f'{self.DEV}/port{port}/line{line}'
+        lines = f'/{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
             task.do_channels.add_do_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             return task.read()
