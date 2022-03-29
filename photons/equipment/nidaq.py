@@ -441,21 +441,37 @@ class NIDAQ(BaseEquipment):
         return task
 
     @staticmethod
-    def time_array(dt: float, nsamples: int) -> np.ndarray:
+    def time_array(dt: float, n: Union[int, np.ndarray]) -> np.ndarray:
         """Create an array based on a sampling time.
 
         Parameters
         ----------
         dt : :class:`float`
             The sampling time.
-        nsamples : :class:`int`
-            The number of samples.
+        n : :class:`int` or :class:`numpy.ndarray`
+            The number of samples. If a :class:`numpy.ndarray` the uses
+            the `size` attribute to determine the number of samples.
 
         Returns
         -------
         :class:`numpy.ndarray`
-            The array.
+            The array (e.g., [0, dt, 2*dt, 3*dt, ..., (n-1)*dt]).
         """
-        if dt == 0:
-            return np.array([0.])
-        return np.linspace(0., dt*nsamples, num=nsamples, endpoint=False, dtype=float)
+        num = n if isinstance(n, int) else n.size
+        return np.linspace(0., dt*num, num=num, endpoint=False, dtype=float)
+
+    @staticmethod
+    def wait_until_done(*tasks: nidaqmx.Task, timeout: float = 10.0) -> None:
+        """Wait until all tasks are done and then close each task.
+
+        Parameters
+        ----------
+        tasks : :class:`nidaqmx.Task`
+            The task(s) to wait for.
+        timeout : :class:`float`, optional
+            The number of seconds to wait for each task to finish.
+            Set to -1 to wait forever.
+        """
+        for task in tasks:
+            task.wait_until_done(timeout=timeout)
+            task.close()
