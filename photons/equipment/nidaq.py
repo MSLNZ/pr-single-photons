@@ -8,16 +8,7 @@ from typing import (
 )
 
 import numpy as np
-from nidaqmx.constants import (
-    Edge,
-    CountDirection,
-    AcquisitionType,
-    TimeUnits,
-    TriggerType,
-    Level,
-    LineGrouping,
-    TerminalConfiguration,
-)
+import nidaqmx.constants
 from msl.qt import Signal
 
 from . import (
@@ -30,14 +21,17 @@ from ..utils import ave_std
 @equipment(manufacturer=r'National Instruments', model=r'USB-6361')
 class NIDAQ(BaseEquipment):
 
-    Edge = Edge
-    CountDirection = CountDirection
-    AcquisitionType = AcquisitionType
-    TimeUnits = TimeUnits
-    TriggerType = TriggerType
-    Level = Level
-    LineGrouping = LineGrouping
-    TerminalConfiguration = TerminalConfiguration
+    WAIT_INFINITELY = nidaqmx.constants.WAIT_INFINITELY
+
+    Edge = nidaqmx.constants.Edge
+    CountDirection = nidaqmx.constants.CountDirection
+    AcquisitionType = nidaqmx.constants.AcquisitionType
+    TimeUnits = nidaqmx.constants.TimeUnits
+    TriggerType = nidaqmx.constants.TriggerType
+    Level = nidaqmx.constants.Level
+    LineGrouping = nidaqmx.constants.LineGrouping
+    TerminalConfiguration = nidaqmx.constants.TerminalConfiguration
+    Task = nidaqmx.Task
 
     counts_changed = Signal(float, float)  # (average, stdev)
 
@@ -55,9 +49,7 @@ class NIDAQ(BaseEquipment):
             a connection in demo mode.
         """
         super(NIDAQ, self).__init__(app, record, demo=demo)
-
         self.DEV = record.connection.address
-        self.Task = self.connection.Task
 
     def analog_in(self,
                   channel: Union[int, str], *,
@@ -117,7 +109,7 @@ class NIDAQ(BaseEquipment):
                [ 0.08861033,  0.09859814,  0.05832474,  0.06831254]]), 0.001)
        """
         if terminal is None:
-            terminal = TerminalConfiguration.BAL_DIFF
+            terminal = NIDAQ.TerminalConfiguration.BAL_DIFF
         if duration is not None:
             nsamples = round(duration * rate)
 
@@ -306,7 +298,7 @@ class NIDAQ(BaseEquipment):
         """
         lines = f'{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
-            task.di_channels.add_di_chan(lines, line_grouping=LineGrouping.CHAN_PER_LINE)
+            task.di_channels.add_di_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             return task.read()
 
     def digital_out(self,
@@ -337,7 +329,7 @@ class NIDAQ(BaseEquipment):
         """
         lines = f'{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
-            task.do_channels.add_do_chan(lines, line_grouping=LineGrouping.CHAN_PER_LINE)
+            task.do_channels.add_do_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             num_channels = len(task.channels.channel_names)
             if isinstance(state, bool) and num_channels > 1:
                 state = [state] * num_channels
@@ -374,7 +366,7 @@ class NIDAQ(BaseEquipment):
         """
         lines = f'{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
-            task.do_channels.add_do_chan(lines, line_grouping=LineGrouping.CHAN_PER_LINE)
+            task.do_channels.add_do_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             return task.read()
 
     @staticmethod
