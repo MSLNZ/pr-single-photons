@@ -335,13 +335,12 @@ class NIDAQ(BaseEquipment):
         Set the state of multiple digital output channels
         >>> digital_out([False, True, True], 1, '2:4')
         """
-        if isinstance(line, str) and isinstance(state, bool) and ':' in line:
-            start, end = map(int, line.split(':'))
-            state = [state] * (end - start + 1)
-
         lines = f'{self.DEV}/port{port}/line{line}'
         with self.Task() as task:
             task.do_channels.add_do_chan(lines, line_grouping=LineGrouping.CHAN_PER_LINE)
+            num_channels = len(task.channels.channel_names)
+            if isinstance(state, bool) and num_channels > 1:
+                state = [state] * num_channels
             assert task.write(state) == 1  # check that it was successful
             task.wait_until_done()
             self.logger.info(f'{self.alias!r} set {lines} to {state}')
