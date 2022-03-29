@@ -369,6 +369,77 @@ class NIDAQ(BaseEquipment):
             task.do_channels.add_do_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
             return task.read()
 
+    def pulse(self,
+              pfi: int,
+              duration: float, *,
+              ctr: int = 1,
+              delay: float = 0,
+              n: int = 1,
+              state: bool = True,
+              timeout: float = 10,
+              wait: bool = True) -> nidaqmx.Task:
+        """Generate one (or more) digital pulse(s).
+
+        If `state` is :data:`True` then the `pfi` terminal will output 0V
+        for `delay` seconds, generate `n` +5V pulse(s) (each with a width
+        of `duration` seconds) and then remain at 0V when the task is done.
+
+        If `state` is :data:`False` then the `pfi` terminal will output +5V
+        for `delay` seconds, generate `n` 0V pulse(s) (each with a width
+        of `duration` seconds) and then remain at +5V when the task is done.
+
+        Parameters
+        ----------
+        pfi : :class:`int`
+            The PFI terminal number to output the pulse(s) from.
+        duration : :class:`float`
+            The duration (width) of each pulse, in seconds.
+        ctr : :class:`int`, optional
+            The counter terminal number to use for timing.
+        delay : :class:`float`, optional
+            The number of seconds to wait before generating the first pulse.
+        n : :class:`int`, optional
+            The number of pulses to generate.
+        state : :class:`bool`, optional
+            Whether to generate HIGH or LOW pulse(s).
+        timeout : :class:`float`, optional
+            The maximum number of seconds to wait for the task to finish.
+            Set to -1 to wait forever.
+        wait : :class:`bool`, optional
+            Whether to wait for the task to finish. If enabled then also
+            closes the task when it is finished.
+
+        Returns
+        -------
+        :class:`~nidaqmx.Task`
+            The task.
+        """
+        if state:
+            idle_state, state_str = self.Level.LOW, 'HIGH'
+        else:
+            idle_state, state_str = self.Level.HIGH, 'LOW'
+
+        task = self.Task()
+        co_channel = task.co_channels.add_co_pulse_chan_time(
+            f'/{self.DEV}/ctr{ctr}',
+            high_time=duration,
+            low_time=duration,
+            idle_state=idle_state,
+            initial_delay=delay,
+        )
+        co_channel.co_pulse_term = f'/{self.DEV}/PFI{pfi}'
+        if n > 1:
+            task.timing.cfg_implicit_timing(
+                sample_mode=self.AcquisitionType.FINITE,
+                samps_per_chan=n,
+            )
+        self.logger.info(f'{self.alias!r} generating {n} {state_str} pulse(s) after {delay} second(s)')
+        task.start()
+        if wait:
+            task.wait_until_done(timeout=timeout)
+            task.close()
+        return task
+
     @staticmethod
     def time_array(dt: float, nsamples: int) -> np.ndarray:
         """Create an array based on a sampling time.
