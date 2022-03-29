@@ -4,6 +4,7 @@ Communicate with a DAQ from National Instruments.
 from typing import (
     Union,
     List,
+    Tuple,
 )
 
 import numpy as np
@@ -60,18 +61,21 @@ class NIDAQ(BaseEquipment):
 
     def analog_in(self,
                   channel: Union[int, str], *,
-                  n: int = 1,
+                  nsamples: int = 1,
                   minimum: float = -10,
                   maximum: float = 10,
-                  terminal: int = None) -> np.ndarray:
+                  terminal: int = None,
+                  rate: float = 1000,
+                  duration: float = None) -> Tuple[np.ndarray, float]:
         """Read the voltage(s) of analog input channel(s).
 
         Parameters
         ----------
         channel : :class:`int` or :class:`str`
             The channel number(s) (e.g., channel=0, channel='0:7').
-        n : :class:`int`, optional
-            The number of samples per channel to read.
+        nsamples : :class:`int`, optional
+            The number of samples per channel to read. If a `duration` is
+            also specified then that value is used instead of `nsamples`.
         minimum : :class:`float`, optional
             The minimum voltage that is expected to be measured.
         maximum : :class:`float`, optional
@@ -79,34 +83,44 @@ class NIDAQ(BaseEquipment):
         terminal : :class:`int`, optional
             Specifies the input terminal configuration for the channel,
             see :class:`~nidaqmx.constants.TerminalConfiguration`
+        rate : :class:`float`, optional
+            The sample rate in Hz.
+        duration : :class:`float`, optional
+            The number of seconds to read voltages for. If specified then
+            this value is used instead of `nsamples`.
 
         Returns
         -------
         :class:`numpy.ndarray`
             The voltage(s) of the requested analog input channel(s).
+        :class:`float`
+            The time interval between samples, i.e., dt.
 
         Examples
         --------
         Read the value of a single analog input channel
         >>> analog_in(0)
-        [1.00164691]
-        >>> analog_in(0, n=5)
-        [1.00212993 1.00180791 1.00164691 1.00164691 1.00164691]
+        (array([-0.48746041]), 0.001)
+        >>> analog_in(0, nsamples=5)
+        (array([-0.44944232, -0.45040888, -0.45137544, -0.45556387, -0.45298637]), 0.001)
 
         Read the values of multiple analog input channels
         >>> analog_in('0:3')
-        [[1.00212993e+00]
-         [1.63000190e-03]
-         [2.50385401e+00]
-         [9.85972715e-04]]
-        >>> analog_in('0:3', n=4)
-        [[1.00261295e+00 1.00164691e+00 1.00148590e+00 1.00261295e+00]
-         [2.75705296e-03 2.43503837e-03 1.95201649e-03 2.27403108e-03]
-         [2.50353199e+00 2.50385401e+00 2.50369300e+00 2.50401501e+00]
-         [2.27403108e-03 2.27403108e-03 2.43503837e-03 1.95201649e-03]]
-        """
+        (array([[0.29932077],
+               [2.40384965],
+               [0.94627278],
+               [0.389211  ]]), 0.001)
+        >>> analog_in('0:3', nsamples=4)
+        (array([[ 0.03512726,  0.03770475,  0.03867132,  0.03512726],
+               [-0.1675285 ,  0.17527869, -0.17171693,  0.17237901],
+               [ 0.08248878,  0.12243999,  0.00741916,  0.07991128],
+               [ 0.08861033,  0.09859814,  0.05832474,  0.06831254]]), 0.001)
+       """
         if terminal is None:
             terminal = TerminalConfiguration.BAL_DIFF
+        if duration is not None:
+            nsamples = round(duration * rate)
+
         ai = f'{self.DEV}/ai{channel}'
         with self.Task() as task:
             task.ai_channels.add_ai_voltage_chan(
@@ -115,11 +129,15 @@ class NIDAQ(BaseEquipment):
                 min_val=minimum,
                 max_val=maximum,
             )
-            return np.asarray(task.read(number_of_samples_per_channel=n))
+            if nsamples > 1:
+                task.timing.cfg_samp_clk_timing(rate, samps_per_chan=nsamples)
+            data = task.read(number_of_samples_per_channel=nsamples)
+            return np.asarray(data), 1.0/task.timing.samp_clk_rate
 
     def analog_out(self,
                    channel: Union[int, str],
-                   voltage: Union[float, List[float], np.ndarray]) -> int:
+                   voltage: Union[float, List[float], np.ndarray],
+                   rate: float = 1000) -> int:
         """Write the voltage(s) to analog output channel(s).
 
         Parameters
@@ -128,6 +146,8 @@ class NIDAQ(BaseEquipment):
             The channel number(s) (e.g., channel=0, channel='0:1').
         voltage : :class:`float`, :class:`list` or :class:`~numpy.ndarray`
             The voltage(s) to output.
+        rate : :class:`float`, optional
+            The sample rate in Hz.
 
         Returns
         -------
@@ -136,20 +156,45 @@ class NIDAQ(BaseEquipment):
 
         Examples
         --------
-        Write a voltage to a single analog output channel
+        Write to a single analog output channel
         >>> analog_out(0, 1.123)
         1
 
-        Write a voltage to multiple analog output channels
+        Write to multiple analog output channels
         >>> analog_out('0:1', [0.2, -1.2])
         1
+        >>> analog_out('0:1', [[0.2, 0.1, 0.], [-0.1, 0., 0.1]])
+        3
         """
+        if isinstance(voltage, (float, int)):
+            array = np.array([voltage], dtype=float)
+        else:
+            array = np.asarray(voltage)
+
+        min_val = np.min(array)
+        max_val = np.max(array)
+        if max_val == min_val:
+            max_val += 0.1
+
         ao = f'{self.DEV}/ao{channel}'
         with self.Task() as task:
-            task.ao_channels.add_ao_voltage_chan(ao)
-            n = task.write(voltage, auto_start=True)
+            task.ao_channels.add_ao_voltage_chan(ao, min_val=min_val, max_val=max_val)
+
+            samps_per_chan = array.size // len(task.channels.channel_names)
+            if samps_per_chan > 1:
+                task.timing.cfg_samp_clk_timing(rate, samps_per_chan=samps_per_chan)
+
+            if samps_per_chan == 1:
+                self.logger.info(f'{self.alias!r} set {ao} to {voltage}')
+            elif array.size <= 100:
+                arr_str = np.array2string(array, max_line_width=1000, separator=',')
+                arr_str = arr_str.replace('\n', '')
+                self.logger.info(f'{self.alias!r} set {ao} at rate {rate} Hz to {arr_str}')
+            else:
+                self.logger.info(f'{self.alias!r} set {ao} at rate {rate} Hz with {array.shape} samples')
+
+            n = task.write(array, auto_start=True)
             task.wait_until_done()
-            self.logger.info(f'{self.alias!r} set {ao} to {voltage}')
             return n
 
     def count_edges(self,
