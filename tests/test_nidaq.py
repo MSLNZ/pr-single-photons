@@ -56,6 +56,6 @@ def test_wait_until_done():
     NIDAQ.wait_until_done(*tasks)
 
 
-def test_wait_inifinity_constant():
+def test_wait_infinity_constant():
     # the docstrings indicate to use -1 to wait forever
     assert NIDAQ.WAIT_INFINITELY == -1
