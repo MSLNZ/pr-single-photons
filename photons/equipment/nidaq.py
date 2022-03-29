@@ -376,3 +376,23 @@ class NIDAQ(BaseEquipment):
         with self.Task() as task:
             task.do_channels.add_do_chan(lines, line_grouping=LineGrouping.CHAN_PER_LINE)
             return task.read()
+
+    @staticmethod
+    def time_array(dt: float, nsamples: int) -> np.ndarray:
+        """Create an array based on a sampling time.
+
+        Parameters
+        ----------
+        dt : :class:`float`
+            The sampling time.
+        nsamples : :class:`int`
+            The number of samples.
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            The array.
+        """
+        if dt == 0:
+            return np.array([0.])
+        return np.linspace(0., dt*nsamples, num=nsamples, endpoint=False, dtype=float)
