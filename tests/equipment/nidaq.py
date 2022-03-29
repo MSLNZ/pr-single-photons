@@ -101,4 +101,41 @@ ave, std = daq.count_edges(1)
 assert ave == 0
 assert math.isnan(std)
 
+#
+# Pulse
+#
+t0 = perf_counter()
+daq.pulse(0, 0.1)
+t1 = perf_counter() - t0
+assert t1 < 0.16
+
+t0 = perf_counter()
+daq.pulse(0, 0.1, n=10)
+t1 = perf_counter() - t0
+assert 1.9 < t1 < 2.1
+
+daq.pulse(2, 0.1, ctr=0, state=False)
+assert daq.digital_out_read(1, 2)
+daq.pulse(2, 0.1, ctr=0)
+assert not daq.digital_out_read(1, 2)
+
+t0 = perf_counter()
+daq.pulse(0, 0.1, delay=1)
+t1 = perf_counter() - t0
+assert 1.1 < t1 < 1.2
+
+daq.pulse(0, 0.1, state=True)
+assert not daq.digital_out_read(1, 0)
+daq.pulse(0, 0.1, state=False)
+assert daq.digital_out_read(1, 0)
+
+task = daq.pulse(0, 1, wait=False)
+while not task.is_task_done():
+    app.logger.info(f'AO: {daq.analog_in(0)[0]}')
+app.logger.info('pulse task is done')
+task.close()
+
+assert not daq.digital_out_read(1, 0)
+assert not daq.digital_out_read(1, 2)
+
 app.disconnect_equipment()
