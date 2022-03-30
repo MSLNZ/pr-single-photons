@@ -41,7 +41,7 @@ class S25120AShutter(Shutter):
 
     def close(self) -> None:
         """Close the shutter."""
-        self._daq.digital_out(False, self._daq_port, self._daq_line)
+        self._daq.digital_out(False, self._daq_line, port=self._daq_port)
         self._log_and_emit_closed()
 
     def is_open(self) -> bool:
@@ -52,9 +52,9 @@ class S25120AShutter(Shutter):
         :class:`bool`
             :data:`True` if the shutter is open, :data:`False` otherwise.
         """
-        return self._daq.digital_out_read(self._daq_port, self._daq_line)
+        return self._daq.digital_out_read(self._daq_line, port=self._daq_port)
 
     def open(self) -> None:
         """Open the shutter."""
-        self._daq.digital_out(True, self._daq_port, self._daq_line)
+        self._daq.digital_out(True, self._daq_line, port=self._daq_port)
         self._log_and_emit_opened()
