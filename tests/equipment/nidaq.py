@@ -8,44 +8,51 @@ import numpy as np
 
 import connect
 
-port = 1
-port_str = str(port)
-
 app, daq = connect.device(
     'daq-ni',
     f'Is it safe to control NI-DAQ? '
-    f'Nothing should be connected to the digital port={port} '
-    f'nor to the analog output terminals.'
+    f'Ideally, nothing should be connected to the terminals.'
 )
 
 #
 # Digital Output
 #
-daq.digital_out(False, port, '0:7')
-assert daq.digital_out_read(port, '0:7') == [False] * 8
+daq.digital_out(False, '0:7')
+assert daq.digital_out_read('0:7') == [False] * 8
 
-daq.digital_out(True, port, 1)
-assert daq.digital_out_read(port, 1) is True
-assert daq.digital_out_read(port, '1:3') == [True, False, False]
+daq.digital_out(True, 1)
+assert daq.digital_out_read(1) is True
+assert daq.digital_out_read('1:3') == [True, False, False]
 
-daq.digital_out(True, port_str, '2:4')
-assert daq.digital_out_read(port, 2) is True
-assert daq.digital_out_read(port, '3') is True
-assert daq.digital_out_read(port_str, 4) is True
-assert daq.digital_out_read(port, '0:7') == [False, True, True, True, True, False, False, False]
+daq.digital_out([False, False, True, False, True, True], 0, port=0)
+assert daq.digital_out_read(0, port=0) is True
 
-daq.digital_out([False, False, True, False, True, True], port_str, '2:7')
-assert daq.digital_out_read(port, '0:7') == [False, True, False, False, True, False, True, True]
+daq.digital_out(True, '2:4')
+assert daq.digital_out_read(2) is True
+assert daq.digital_out_read('3') is True
+assert daq.digital_out_read(4) is True
+assert daq.digital_out_read('0:7') == [False, True, True, True, True, False, False, False]
 
-daq.digital_out(False, port, '0:7')
-for i in range(8):
-    assert daq.digital_out_read(port, i) is False
+daq.digital_out([False, False, True, False, True, True], '2:7')
+assert daq.digital_out_read('0:7') == [False, True, False, False, True, False, True, True]
+
+states = [[True, False, True, False], [False, True, False, True]]
+daq.digital_out(states, '0:1', port=0)
+assert daq.digital_out_read('0:1', port=0) == [False, True]
+
+for port in [0, 1, 2]:
+    daq.digital_out(False, '0:7', port=port)
+    for i in range(8):
+        assert daq.digital_out_read(i, port=port) is False
 
 #
 # Digital Input
 #
-assert daq.digital_in(port, 1) is False
-assert daq.digital_in(port_str, '0:7') == [False] * 8
+assert daq.digital_in(0) is False
+assert daq.digital_in(0, port=0) is False
+assert daq.digital_in(0, port=2) is False
+assert daq.digital_in('3:5') == [False] * 3
+assert daq.digital_in('0:7') == [False] * 8
 
 #
 # Analog Input
@@ -75,24 +82,24 @@ x2 = daq.time_array(dt, 100)
 assert np.array_equal(x, x2)
 
 #
-# Analog Output
+# Analog Output (the analog_out method has an internal assert statement)
 #
-assert daq.analog_out(0, 0) == 1
-assert daq.analog_out(0, 0.1) == 1
-assert daq.analog_out(0, [-0.1]) == 1
-assert daq.analog_out(0, [-0.2, -0.1, 0., 0.1, 0.2]) == 5
-assert daq.analog_out('0:1', np.array([0.1, -0.1])) == 1
-assert daq.analog_out('0:1', [0., 0.]) == 1
-assert daq.analog_out('0:1', [[-0.2, -0.1, 0., 0.1, 0.2], [0.2, 0.1, 0., -0.1, -0.2]]) == 5
+daq.analog_out(0, 0)
+daq.analog_out(0, 0.1)
+daq.analog_out(0, [-0.1])
+daq.analog_out(0, [-0.2, -0.1, 0., 0.1, 0.2])
+daq.analog_out('0:1', np.array([0.1, -0.1]))
+daq.analog_out('0:1', [0., 0.])
+daq.analog_out('0:1', [[-0.2, -0.1, 0., 0.1, 0.2], [0.2, 0.1, 0., -0.1, -0.2]])
 
 t0 = perf_counter()
-assert daq.analog_out('0', [0., 0.1, 0.2], rate=1) == 3
+daq.analog_out('0', [0., 0.1, 0.2], rate=1)
 assert perf_counter() - t0 > 2.0
 
 values = np.sin(np.linspace(0, 2*np.pi, 1000))
-assert daq.analog_out(0, values, rate=1e5) == 1000
+daq.analog_out(0, values, rate=1e5)
 
-assert daq.analog_out('0:1', [[0.], [0.]]) == 1
+daq.analog_out('0:1', [[0.], [0.]])
 
 #
 # Count edges
@@ -105,37 +112,37 @@ assert math.isnan(std)
 # Pulse
 #
 t0 = perf_counter()
-daq.pulse(0, 0.1)
+daq.pulse(0.1, 0)
 t1 = perf_counter() - t0
 assert t1 < 0.16
 
 t0 = perf_counter()
-daq.pulse(0, 0.1, n=10)
+daq.pulse(0.1, 0, n=10)
 t1 = perf_counter() - t0
 assert 1.9 < t1 < 2.1
 
-daq.pulse(2, 0.1, ctr=0, state=False)
-assert daq.digital_out_read(1, 2)
-daq.pulse(2, 0.1, ctr=0)
-assert not daq.digital_out_read(1, 2)
+daq.pulse(0.1, 2, ctr=0, state=False)
+assert daq.digital_out_read(2)
+daq.pulse(0.1, 2, ctr=0)
+assert not daq.digital_out_read(2)
 
 t0 = perf_counter()
-daq.pulse(0, 0.1, delay=1)
+daq.pulse(0.1, 0, delay=1)
 t1 = perf_counter() - t0
 assert 1.1 < t1 < 1.2
 
-daq.pulse(0, 0.1, state=True)
-assert not daq.digital_out_read(1, 0)
-daq.pulse(0, 0.1, state=False)
-assert daq.digital_out_read(1, 0)
+daq.pulse(0.1, 0, state=True)
+assert not daq.digital_out_read(0)
+daq.pulse(0.1, 0, state=False)
+assert daq.digital_out_read(0)
 
-task = daq.pulse(0, 1, wait=False)
+task = daq.pulse(1, 0, wait=False)
 while not task.is_task_done():
-    app.logger.info(f'AO: {daq.analog_in(0)[0]}')
+    app.logger.info(f'AI0: {daq.analog_in(0)[0]}')
 app.logger.info('pulse task is done')
 task.close()
 
-assert not daq.digital_out_read(1, 0)
-assert not daq.digital_out_read(1, 2)
+assert not daq.digital_out_read(0)
+assert not daq.digital_out_read(2)
 
 app.disconnect_equipment()
