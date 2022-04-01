@@ -1,6 +1,9 @@
 import numpy as np
 
-from photons.equipment.nidaq import NIDAQ
+from photons.equipment.nidaq import (
+    NIDAQ,
+    Trigger,
+)
 
 
 def test_time_array():
@@ -59,3 +62,30 @@ def test_wait_until_done():
 def test_wait_infinity_constant():
     # the docstrings indicate to use -1 to wait forever
     assert NIDAQ.WAIT_INFINITELY == -1
+
+
+def test_trigger_repr():
+    t = Trigger(1, 'Dev1')
+    assert str(t) == 'Trigger<source=/Dev1/PFI1, edge=Edge.RISING>'
+    assert repr(t) == 'Trigger<source=/Dev1/PFI1, edge=Edge.RISING>'
+
+    t = Trigger(0, 'Dev1', delay=0.1)
+    assert str(t) == 'Trigger<source=/Dev1/PFI0, edge=Edge.RISING, delay=0.1>'
+
+    t = Trigger(1, 'Dev1', rising=False)
+    assert str(t) == 'Trigger<source=/Dev1/PFI1, edge=Edge.FALLING>'
+
+    t = Trigger(0, 'Dev1', delay=-0.1)
+    assert str(t) == 'Trigger<source=/Dev1/PFI0, edge=Edge.RISING, delay=-0.1>'
+
+    t = Trigger(0, 'Whatever', level=0)
+    assert str(t) == 'Trigger<source=/Whatever/APFI0, slope=Slope.RISING, level=0>'
+
+    t = Trigger(0, 'Dev2', level=0, rising=False, delay=-1.2)
+    assert str(t) == 'Trigger<source=/Dev2/APFI0, slope=Slope.FALLING, level=0, delay=-1.2>'
+
+    t = Trigger(0, 'Dev2', level=2.2, hysteresis=-0.01)
+    assert str(t) == 'Trigger<source=/Dev2/APFI0, slope=Slope.RISING, level=2.2, hysteresis=-0.01>'
+
+    t = Trigger(0, 'Dev2', level=-1.1, rising=True, delay=-1.2, hysteresis=0.21)
+    assert str(t) == 'Trigger<source=/Dev2/APFI0, slope=Slope.RISING, level=-1.1, delay=-1.2, hysteresis=0.21>'
