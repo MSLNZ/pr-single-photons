@@ -41,7 +41,7 @@ class S25120AShutter(Shutter):
 
     def close(self) -> None:
         """Close the shutter."""
-        self._daq.digital_out(False, self._daq_line, port=self._daq_port)
+        self._daq.digital_out(self._daq_line, False, port=self._daq_port)
         self._log_and_emit_closed()
 
     def is_open(self) -> bool:
@@ -56,5 +56,5 @@ class S25120AShutter(Shutter):
 
     def open(self) -> None:
         """Open the shutter."""
-        self._daq.digital_out(True, self._daq_line, port=self._daq_port)
+        self._daq.digital_out(self._daq_line, True, port=self._daq_port)
         self._log_and_emit_opened()
