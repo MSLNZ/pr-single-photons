@@ -304,9 +304,11 @@ class NIDAQ(BaseEquipment):
         written = task.write(array, auto_start=True, timeout=timeout)
         assert written == samps_per_chan
         if wait:
-            task.wait_until_done(timeout=timeout)
-            task.close()
-            self._tasks.remove(task)
+            try:
+                task.wait_until_done(timeout=timeout)
+            finally:
+                task.close()
+                self._tasks.remove(task)
         return task
 
     def close_all_tasks(self) -> None:
@@ -507,9 +509,11 @@ class NIDAQ(BaseEquipment):
         written = task.write(state, auto_start=True, timeout=timeout)
         assert written == samps_per_chan
         if wait:
-            task.wait_until_done(timeout=timeout)
-            task.close()
-            self._tasks.remove(task)
+            try:
+                task.wait_until_done(timeout=timeout)
+            finally:
+                task.close()
+                self._tasks.remove(task)
         return task
 
     def digital_out_read(self,
@@ -624,9 +628,11 @@ class NIDAQ(BaseEquipment):
                          f'after {delay} second(s)')
         task.start()
         if wait:
-            task.wait_until_done(timeout=timeout)
-            task.close()
-            self._tasks.remove(task)
+            try:
+                task.wait_until_done(timeout=timeout)
+            finally:
+                task.close()
+                self._tasks.remove(task)
         return task
 
     def trigger(self, channel: int, **kwargs) -> Trigger:

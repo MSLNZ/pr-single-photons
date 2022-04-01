@@ -196,16 +196,12 @@ message = r'Wait Until Done did not indicate that the task ' \
           r'was done within the specified timeout.'
 with pytest.raises(DaqError, match=message):
     daq.analog_out(0, [0, 0], timeout=1, trigger=daq.trigger(0, level=0.0))
-daq.close_all_tasks()
 with pytest.raises(DaqError, match=message):
     daq.analog_out(0, [0, 0], timeout=1, trigger=daq.trigger(0, level=0.0, delay=0.1))
-daq.close_all_tasks()
 with pytest.raises(DaqError, match=message):
     daq.analog_out(0, [0, 0], timeout=1, trigger=daq.trigger(0))
-daq.close_all_tasks()
 with pytest.raises(DaqError, match=message):
     daq.analog_out(0, [0, 0], timeout=1, trigger=daq.trigger(0, delay=0.1))
-daq.close_all_tasks()
 
 
 app.disconnect_equipment()
