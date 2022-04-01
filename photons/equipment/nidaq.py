@@ -312,10 +312,11 @@ class NIDAQ(BaseEquipment):
         return task
 
     def close_all_tasks(self) -> None:
-        """Close all tasks that have been created."""
-        for task in self._tasks:
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', ResourceWarning)
+        """Close all tasks that have been created by this :class:`.NIDAQ` instance."""
+        with warnings.catch_warnings():
+            # closing an already-closed task indicates a ResourceWarning
+            warnings.simplefilter('ignore', ResourceWarning)
+            for task in self._tasks:
                 task.close()
         self._tasks.clear()
 
