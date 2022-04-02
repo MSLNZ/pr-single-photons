@@ -101,7 +101,75 @@ assert perf_counter() - t0 > 2.0
 values = np.sin(np.linspace(0, 2*np.pi, 1000))
 daq.analog_out(0, values, rate=1e5)
 
-daq.analog_out('0:1', [[0.], [0.]])
+daq.analog_out('0:1', [0., 0.])
+
+#
+# Read Analog Output
+#
+values, dt = daq.analog_out_read(0)
+assert dt == 0.001
+assert values.size == 1
+assert values[0] == pytest.approx(0.0, abs=0.005)
+values, dt = daq.analog_out_read(1)
+assert dt == 0.001
+assert values.size == 1
+assert values[0] == pytest.approx(0.0, abs=0.005)
+values, dt = daq.analog_out_read('0:1')
+assert dt == 0.001
+assert values.shape == (2, 1)
+assert values[0, 0] == pytest.approx(0.0, abs=0.005)
+assert values[1, 0] == pytest.approx(0.0, abs=0.005)
+
+daq.analog_out('0:1', [-1.1, 0.21])
+values, dt = daq.analog_out_read(0)
+assert dt == 0.001
+assert values.size == 1
+assert values[0] == pytest.approx(-1.1, abs=0.005)
+values, dt = daq.analog_out_read(1)
+assert dt == 0.001
+assert values.size == 1
+assert values[0] == pytest.approx(0.21, abs=0.005)
+values, dt = daq.analog_out_read('0:1')
+assert dt == 0.001
+assert values.shape == (2, 1)
+assert values[0, 0] == pytest.approx(-1.1, abs=0.005)
+assert values[1, 0] == pytest.approx(0.21, abs=0.005)
+values, _ = daq.analog_out_read('0:0')
+assert values.shape == (1,)
+assert values[0] == pytest.approx(-1.1, abs=0.005)
+values, _ = daq.analog_out_read('1:1')
+assert values.shape == (1,)
+assert values[0] == pytest.approx(0.21, abs=0.005)
+
+
+values, dt = daq.analog_out_read(0, nsamples=10, rate=10)
+assert dt == 0.1
+assert values.shape == (10,)
+for value in values:
+    assert value == pytest.approx(-1.1, abs=0.005)
+
+values, dt = daq.analog_out_read(1, nsamples=100)
+assert dt == 0.001
+assert values.shape == (100,)
+for value in values:
+    assert value == pytest.approx(0.21, abs=0.005)
+
+values, dt = daq.analog_out_read('0:1', nsamples=5, rate=1e5)
+assert dt == 0.00001
+assert values.shape == (2, 5)
+for value in values[0, :]:
+    assert value == pytest.approx(-1.1, abs=0.005)
+for value in values[1, :]:
+    assert value == pytest.approx(0.21, abs=0.005)
+
+daq.analog_out('0:1', [0., 0.])
+values, _ = daq.analog_out_read(0)
+assert values[0] == pytest.approx(0.0, abs=0.005)
+values, _ = daq.analog_out_read(1)
+assert values[0] == pytest.approx(0.0, abs=0.005)
+values, _ = daq.analog_out_read('0:1')
+assert values[0, 0] == pytest.approx(0.0, abs=0.005)
+assert values[1, 0] == pytest.approx(0.0, abs=0.005)
 
 #
 # Count edges

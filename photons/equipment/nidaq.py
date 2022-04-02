@@ -213,9 +213,16 @@ class NIDAQ(BaseEquipment):
         if duration is not None:
             nsamples = round(duration * rate)
 
+        if isinstance(channel, str) and channel.endswith('_vs_aognd'):
+            # read from the analog-output channel(s)
+            # see: self.analog_out_read
+            ai_channel = channel
+        else:
+            ai_channel = f'/{self.DEV}/ai{channel}'
+
         with self.Task() as task:
             task.ai_channels.add_ai_voltage_chan(
-                f'/{self.DEV}/ai{channel}',
+                ai_channel,
                 terminal_config=config,
                 min_val=minimum,
                 max_val=maximum,
@@ -310,6 +317,47 @@ class NIDAQ(BaseEquipment):
                 task.close()
                 self._tasks.remove(task)
         return task
+
+    def analog_out_read(self, channel: Union[int, str], **kwargs) -> Tuple[np.ndarray, float]:
+        """Read the output voltage(s) from the analog-output channel(s).
+
+        Parameters
+        ----------
+        channel : :class:`int` or :class:`str`
+            The analog-output channel(s).
+        **kwargs
+            All additional keyword arguments are passed to :meth:`.analog_in`.
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            The voltage(s) of the requested analog-output channel(s).
+        :class:`float`
+            The time interval between samples (i.e., dt).
+
+        Examples
+        --------
+        Read a single value from an analog-output channel
+        >>> analog_out_read(0)
+        (array([-1.09800537]), 0.001)
+
+        Read multiple values from multiple analog-output channels
+        >>> analog_out_read('0:1', nsamples=4, rate=10)
+        (array([[-1.09832756, -1.09736099, -1.09800537, -1.09736099],
+               [ 0.21168585,  0.21233022,  0.21200803,  0.21168585]]), 0.1)
+        """
+        def name(index):
+            return f'/{self.DEV}/_ao{index}_vs_aognd'
+
+        if isinstance(channel, str) and ':' in channel:
+            start, end = map(int, channel.split(':'))
+            assert end >= start
+            channels = [name(ch) for ch in range(start, end+1, 1)]
+            ao_channels = ','.join(channels)
+        else:
+            ao_channels = name(channel)
+
+        return self.analog_in(ao_channels, **kwargs)
 
     def close_all_tasks(self) -> None:
         """Close all tasks that have been created by this :class:`.NIDAQ` instance."""
