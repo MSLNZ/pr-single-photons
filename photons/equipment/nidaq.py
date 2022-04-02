@@ -504,9 +504,8 @@ class NIDAQ(BaseEquipment):
         port : :class:`int`, optional
             The port number.
         rate : :class:`float`, optional
-            The sample rate in Hz. The rate parameter is used when multiple
-            samples per channel are specfied. The required lines must support
-            buffered operations otherwise an excpetion will be raised. For a
+            The sample rate in Hz. The specified `line` must support
+            buffered operations otherwise an exception will be raised. For a
             NI USB-6361 device, the available buffered lines are in port=0.
         timeout : :class:`float`, optional
             The maximum number of seconds to wait for the task to finish.
