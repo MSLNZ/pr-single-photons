@@ -15,6 +15,7 @@ from msl.qt import (
     convert,
     QtCore,
     Signal,
+    prompt,
 )
 from msl.network.client import Link
 from msl.network import connect
@@ -83,6 +84,11 @@ class App(QtCore.QObject):
     def logger(self) -> logging.Logger:
         """:class:`logging.Logger`: The application logger."""
         return logger
+
+    @property
+    def prompt(self) -> prompt:
+        """Prompt the user."""
+        return prompt
 
     def gui(self, show=True):
         """Create the main application GUI.
