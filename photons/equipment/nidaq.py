@@ -19,65 +19,110 @@ from . import (
 from ..utils import ave_std
 
 
-class Trigger(object):
+class Timing(object):
 
-    def __init__(self,
-                 channel: int,
-                 device_name: str, *,
-                 delay: float = 0,
-                 hysteresis: float = 0,
-                 level: float = None,
-                 rising: bool = True):
-        """Configure a trigger event.
+    def __init__(self, **kwargs):
+        """Do not instantiate this class directly. Use :meth:`.NIDAQ.timing`."""
+        self._samples_per_channel = 1
+        self._source = kwargs['source']
+        self._rate = kwargs['rate']
+        if kwargs['rising']:
+            self._active_edge = NIDAQ.Edge.RISING
+        else:
+            self._active_edge = NIDAQ.Edge.FALLING
+        if kwargs['finite']:
+            self._sample_mode = NIDAQ.AcquisitionType.FINITE
+        else:
+            self._sample_mode = NIDAQ.AcquisitionType.CONTINUOUS
+
+        settings = [
+            f'rate={self._rate}',
+            f'edge={self._active_edge.name}',
+            f'mode={self._sample_mode.name}',
+        ]
+        if self._source:
+            settings.append(f'source={self._source}')
+        self._settings = ', '.join(settings)
+
+    def __repr__(self):
+        return f'Timing<{self._settings}>'
+
+    def add_to(self, task: nidaqmx.Task) -> None:
+        """Add the timing configuration to a task.
 
         Parameters
         ----------
-        channel : :class:`int` or :class:`str`
-            Either a PFI or an AI channel number to use as the trigger source.
-        device_name : :class:`str`
-            The name of the device (e.g., Dev1).
-        delay : :class:`float`, optional
-            The time (in seconds) between the trigger event and when to
-            acquire/generate samples. Can be < 0 to acquire/generate samples
-            before the trigger event (only if the NIDAQ task supports it).
-        hysteresis : :class:`float`, optional
-            Specifies a hysteresis level in the units of the measurement.
-            Only applicable for an analog trigger.
-        level : :class:`float`, optional
-            The voltage level to use for the trigger signal. Whether this value
-            is set decides whether the trigger source is from a digital or an
-            analog channel. If :data`None` then `channel` refers to a PFI
-            channel (a digital trigger). Otherwise, `channel` refers to an
-            AI channel (an analog trigger).
-        rising : :class:`bool`, optional
-            Whether to use the rising or falling edge(slope) of the
-            digital(analog) trigger signal.
+        task : :class:`~nidaqmx.Task`
+            The task to add the timing configuration to.
         """
-        self._delay = delay
-        self._level = level
-        self._hysteresis = hysteresis
-        if level is None:  # digital trigger
+        task.timing.cfg_samp_clk_timing(
+            self._rate,
+            source=self._source,
+            active_edge=self._active_edge,
+            sample_mode=self._sample_mode,
+            samps_per_chan=self._samples_per_channel
+        )
+
+    @property
+    def rate(self) -> float:
+        """Return the sample rate (in Hz)."""
+        return self._rate
+
+    @property
+    def sample_mode(self) -> nidaqmx.constants.AcquisitionType:
+        """Return the sample mode."""
+        return self._sample_mode
+
+    @property
+    def samples_per_channel(self) -> int:
+        """The number of samples per channel to acquire or generate."""
+        return self._samples_per_channel
+
+    @samples_per_channel.setter
+    def samples_per_channel(self, value):
+        self._samples_per_channel = int(value)
+
+
+class Trigger(object):
+
+    def __init__(self, **kwargs):
+        """Do not instantiate this class directly. Use :meth:`.NIDAQ.trigger`."""
+        self._delay = kwargs['delay']
+        self._level = kwargs['level']
+        self._hysteresis = kwargs['hysteresis']
+        self._retriggerable = kwargs['retriggerable']
+        settings = [f'source={kwargs["source"]}']
+        if self._level is None:
+            # digital trigger
+            edge = NIDAQ.Edge.RISING if kwargs['rising'] else NIDAQ.Edge.FALLING
             self._kwargs = {
-                'trigger_source': f'/{device_name}/PFI{channel}',
-                'trigger_edge': NIDAQ.Edge.RISING if rising else NIDAQ.Edge.FALLING
+                'trigger_source':  kwargs['source'],
+                'trigger_edge': edge
             }
-        else:  # analog trigger
+            settings.append(f'edge={edge.name}')
+        else:
+            # analog trigger
+            slope = NIDAQ.Slope.RISING if kwargs['rising'] else NIDAQ.Slope.FALLING
             self._kwargs = {
-                'trigger_source': f'/{device_name}/APFI{channel}',
-                'trigger_slope': NIDAQ.Slope.RISING if rising else NIDAQ.Slope.FALLING,
-                'trigger_level': level
+                'trigger_source': kwargs['source'],
+                'trigger_slope': slope,
+                'trigger_level': self._level
             }
+            settings.extend([f'slope={slope.name}, level={self._level}'])
+
+        if self._delay != 0:
+            settings.append(f'delay={self._delay}')
+        if self._retriggerable:
+            settings.append(f'retriggerable=True')
+        if self._hysteresis != 0:
+            settings.append(f'hysteresis={self._hysteresis}')
+
+        self._settings = ', '.join(settings)
 
     def __repr__(self):
-        kwargs = ', '.join(f'{k[8:]}={v}' for k, v in self._kwargs.items())
-        rep = f'Trigger<{kwargs}>'
-        if self._delay != 0:
-            rep = rep.rstrip('>') + f', delay={self._delay}>'
-        if self._hysteresis != 0:
-            rep = rep.rstrip('>') + f', hysteresis={self._hysteresis}>'
-        return rep
+        return f'Trigger<{self._settings}>'
 
-    def add(self, task: nidaqmx.Task) -> None:
+    def add_to(self, task: nidaqmx.Task) -> None:
         """Add this trigger to a task.
 
         Parameters
@@ -94,19 +139,23 @@ class Trigger(object):
                 t.cfg_anlg_edge_ref_trig(pretrigger_samples=pre, **self._kwargs)
                 if self._hysteresis != 0:
                     t.anlg_edge_hyst = self._hysteresis
-            return
-
-        t = task.triggers.start_trigger
-        if self._level is None:
-            t.cfg_dig_edge_start_trig(**self._kwargs)
+            if self._retriggerable:
+                t.retriggerable = True
         else:
-            t.cfg_anlg_edge_start_trig(**self._kwargs)
-            if self._hysteresis != 0:
-                t.anlg_edge_hyst = self._hysteresis
+            t = task.triggers.start_trigger
+            if self._level is None:
+                t.cfg_dig_edge_start_trig(**self._kwargs)
+            else:
+                t.cfg_anlg_edge_start_trig(**self._kwargs)
+                if self._hysteresis != 0:
+                    t.anlg_edge_hyst = self._hysteresis
 
-        if self._delay > 0:
-            t.delay_units = NIDAQ.DigitalWidthUnits.SECONDS
-            t.delay = self._delay
+            if self._delay > 0:
+                t.delay_units = NIDAQ.DigitalWidthUnits.SECONDS
+                t.delay = self._delay
+
+            if self._retriggerable:
+                t.retriggerable = True
 
 
 @equipment(manufacturer=r'National Instruments', model=r'USB-6361')
@@ -146,21 +195,22 @@ class NIDAQ(BaseEquipment):
 
     def analog_in(self,
                   channel: Union[int, str], *,
-                  config: int = None,
+                  config: Union[int, str] = 'BAL_DIFF',
                   duration: float = None,
                   maximum: float = 10,
                   minimum: float = -10,
                   nsamples: int = 1,
-                  rate: float = 1000,
                   timeout: float = 10,
-                  trigger: Trigger = None) -> Tuple[np.ndarray, float]:
+                  timing: Timing = None,
+                  trigger: Trigger = None,
+                  wait: bool = True) -> Tuple[Union[np.ndarray, nidaqmx.Task], float]:
         """Read the voltage(s) of the analog-input channel(s).
 
         Parameters
         ----------
         channel : :class:`int` or :class:`str`
-            The channel number(s) (e.g., channel=0, channel='0:7').
-        config : :class:`int`, optional
+            The analog-input channel number(s) (e.g., channel=0, channel='0:7').
+        config : :class:`int` or :class:`str`, optional
             Specifies the input terminal configuration for the channel,
             see :class:`~nidaqmx.constants.TerminalConfiguration`.
         duration : :class:`float`, optional
@@ -173,74 +223,86 @@ class NIDAQ(BaseEquipment):
         nsamples : :class:`int`, optional
             The number of samples per channel to read. If a `duration` is
             also specified then that value is used instead of `nsamples`.
-        rate : :class:`float`, optional
-            The sample rate in Hz.
         timeout : :class:`float`, optional
             The maximum number of seconds to wait for the task to finish.
             Set to -1 to wait forever.
+        timing : :class:`.Timing`, optional
+            The timing settings to use. See :meth:`.timing`.
         trigger : :class:`.Trigger`, optional
             The trigger settings to use. See :meth:`.trigger`.
+        wait : :class:`bool`, optional
+            Whether to wait for the task to finish. If enabled then also
+            closes the task when it is finished.
 
         Returns
         -------
-        :class:`numpy.ndarray`
-            The voltage(s) of the requested analog-input channel(s).
+        :class:`~numpy.ndarray` or :class:`~nidaqmx.Task`
+            If `wait` is :data:`True` then the voltage(s) of the requested
+            analog-input channel(s). Otherwise the analog-input task, which
+            has *not* been started yet. Not starting the task allows one to
+            register a callback before starting the task.
         :class:`float`
             The time interval between samples (i.e., dt).
 
         Examples
         --------
-        Read the value of a single analog input channel
-        >>> analog_in(0)
+        Read the value of a single analog-input channel
+        >>> daq.analog_in(0)
         (array([-0.48746041]), 0.001)
-        >>> analog_in(0, nsamples=5)
+        >>> daq.analog_in(6, nsamples=5)
         (array([-0.44944232, -0.45040888, -0.45137544, -0.45556387, -0.45298637]), 0.001)
 
-        Read the values of multiple analog input channels
-        >>> analog_in('0:3')
-        (array([[0.29932077],
-               [2.40384965],
-               [0.94627278],
-               [0.389211  ]]), 0.001)
-        >>> analog_in('0:3', nsamples=4)
+        Read the values of multiple analog-input channels
+        >>> daq.analog_in('0:3', nsamples=4)
         (array([[ 0.03512726,  0.03770475,  0.03867132,  0.03512726],
                [-0.1675285 ,  0.17527869, -0.17171693,  0.17237901],
                [ 0.08248878,  0.12243999,  0.00741916,  0.07991128],
                [ 0.08861033,  0.09859814,  0.05832474,  0.06831254]]), 0.001)
        """
-        if config is None:
-            config = NIDAQ.TerminalConfiguration.BAL_DIFF
-        if duration is not None:
-            nsamples = round(duration * rate)
-
-        if isinstance(channel, str) and channel.endswith('_vs_aognd'):
-            # read from the analog-output channel(s)
-            # see: self.analog_out_read
+        if isinstance(channel, str) and channel.startswith(f'/{self.DEV}'):
             ai_channel = channel
         else:
             ai_channel = f'/{self.DEV}/ai{channel}'
 
-        with self.Task() as task:
-            task.ai_channels.add_ai_voltage_chan(
-                ai_channel,
-                terminal_config=config,
-                min_val=minimum,
-                max_val=maximum,
-            )
-            if nsamples > 1 or trigger is not None:
-                self.logger.info(f'{self.alias!r} set analog-input timing to {rate} Hz')
-                task.timing.cfg_samp_clk_timing(rate, samps_per_chan=nsamples)
-            if trigger is not None:
-                self.logger.info(f'{self.alias!r} add {trigger} to analog-input task')
-                trigger.add(task)
-            data = task.read(number_of_samples_per_channel=nsamples, timeout=timeout)
-            return np.asarray(data), 1.0/task.timing.samp_clk_rate
+        tc = self.convert_to_enum(config, NIDAQ.TerminalConfiguration, to_upper=True)
+
+        task = self.Task()
+        self._tasks.append(task)
+        task.ai_channels.add_ai_voltage_chan(
+            ai_channel,
+            terminal_config=tc,
+            min_val=minimum,
+            max_val=maximum,
+        )
+
+        if timing is None:
+            timing = self.timing()
+
+        if duration is None:
+            timing.samples_per_channel = nsamples
+        else:
+            timing.samples_per_channel = round(duration * timing.rate)
+
+        self._maybe_set_timing_and_trigger(task, timing, trigger, 'analog-input')
+
+        dt = 1.0 / task.timing.samp_clk_rate
+        if wait:
+            try:
+                data = task.read(
+                    number_of_samples_per_channel=timing.samples_per_channel,
+                    timeout=timeout
+                )
+            finally:
+                task.close()
+                self._tasks.remove(task)
+            return np.asarray(data), dt
+        return task, dt
 
     def analog_out(self,
                    channel: Union[int, str],
                    voltage: Union[float, List[float], List[List[float]], np.ndarray], *,
-                   rate: float = 1000,
                    timeout: float = 10,
+                   timing: Timing = None,
                    trigger: Trigger = None,
                    wait: bool = True) -> nidaqmx.Task:
         """Write the voltage(s) to the analog-output channel(s).
@@ -248,14 +310,14 @@ class NIDAQ(BaseEquipment):
         Parameters
         ----------
         channel : :class:`int` or :class:`str`
-            The channel number(s) (e.g., channel=0, channel='0:1').
+            The analog-output channel number(s) (e.g., channel=0, channel='0:1').
         voltage : :class:`float`, :class:`list` or :class:`~numpy.ndarray`
             The voltage(s) to output.
-        rate : :class:`float`, optional
-            The sample rate in Hz.
         timeout : :class:`float`, optional
             The maximum number of seconds to wait for the task to finish.
             Set to -1 to wait forever.
+        timing : :class:`.Timing`, optional
+            The timing settings to use. See :meth:`.timing`.
         trigger : :class:`.Trigger`, optional
             The trigger settings to use. See :meth:`.trigger`.
         wait : :class:`bool`, optional
@@ -270,11 +332,11 @@ class NIDAQ(BaseEquipment):
         Examples
         --------
         Write to a single analog-output channel
-        >>> analog_out(0, 1.123)
+        >>> daq.analog_out(0, 1.123)
 
         Write to multiple analog-output channels
-        >>> analog_out('0:1', [0.2, -1.2])
-        >>> analog_out('0:1', [[0.2, 0.1, 0.], [-0.1, 0., 0.1]])
+        >>> daq.analog_out('0:1', [0.2, -1.2])
+        >>> daq.analog_out('0:1', [[0.2, 0.1, 0.], [-0.1, 0., 0.1]])
         """
         if isinstance(voltage, (float, int)):
             array = np.array([voltage], dtype=float)
@@ -289,27 +351,19 @@ class NIDAQ(BaseEquipment):
         ao = f'/{self.DEV}/ao{channel}'
         task = self.Task()
         self._tasks.append(task)
+
         task.ao_channels.add_ao_voltage_chan(ao, min_val=min_val, max_val=max_val)
 
-        samps_per_chan = array.size // task.number_of_channels
-        if samps_per_chan > 1 or trigger is not None:
-            self.logger.info(f'{self.alias!r} set analog-output timing to {rate} Hz '
-                             f'with {samps_per_chan} samples/channel')
-            task.timing.cfg_samp_clk_timing(rate, samps_per_chan=samps_per_chan)
+        if timing is None:
+            timing = self.timing()
+        timing.samples_per_channel = array.size // task.number_of_channels
 
-        if trigger is not None:
-            self.logger.info(f'{self.alias!r} add {trigger} to analog-output task')
-            trigger.add(task)
+        self._maybe_set_timing_and_trigger(task, timing, trigger, 'analog-output')
 
-        if array.size <= 25:
-            a2s = np.array2string(array, max_line_width=1000, separator=',')
-            arr_str = a2s.replace('\n', '')
-            self.logger.info(f'{self.alias!r} set {ao} to {arr_str}')
-        else:
-            self.logger.info(f'{self.alias!r} set {ao} with {array.shape} samples')
+        self.logger.info(f'{self.alias!r} set {ao} with {array.shape} samples')
 
         written = task.write(array, auto_start=True, timeout=timeout)
-        assert written == samps_per_chan
+        assert written == timing.samples_per_channel
         if wait:
             try:
                 task.wait_until_done(timeout=timeout)
@@ -318,33 +372,38 @@ class NIDAQ(BaseEquipment):
                 self._tasks.remove(task)
         return task
 
-    def analog_out_read(self, channel: Union[int, str], **kwargs) -> Tuple[np.ndarray, float]:
+    def analog_out_read(self, channel: Union[int, str], **kwargs) -> \
+            Tuple[Union[np.ndarray, nidaqmx.Task], float]:
         """Read the output voltage(s) from the analog-output channel(s).
 
         Parameters
         ----------
         channel : :class:`int` or :class:`str`
-            The analog-output channel(s).
+            The analog-output channel number(s) (e.g., channel=0, channel='0:1').
         **kwargs
-            All additional keyword arguments are passed to :meth:`.analog_in`.
+            All keyword arguments are passed to :meth:`.analog_in`.
 
         Returns
         -------
-        :class:`numpy.ndarray`
-            The voltage(s) of the requested analog-output channel(s).
+        :class:`~numpy.ndarray` or :class:`~nidaqmx.Task`
+            If the keyword argument `wait` is :data:`True` then the voltage(s)
+            of the requested analog-output channel(s). Otherwise the analog-input
+            task, which has *not* been started yet, that is reading from the
+            analog-ouput channel(s). Not starting the task allows one to
+            register a callback before starting the task.
         :class:`float`
             The time interval between samples (i.e., dt).
 
         Examples
         --------
         Read a single value from an analog-output channel
-        >>> analog_out_read(0)
+        >>> daq.analog_out_read(0)
         (array([-1.09800537]), 0.001)
 
         Read multiple values from multiple analog-output channels
-        >>> analog_out_read('0:1', nsamples=4, rate=10)
+        >>> daq.analog_out_read('0:1', nsamples=4)
         (array([[-1.09832756, -1.09736099, -1.09800537, -1.09736099],
-               [ 0.21168585,  0.21233022,  0.21200803,  0.21168585]]), 0.1)
+               [ 0.21168585,  0.21233022,  0.21200803,  0.21168585]]), 0.001)
         """
         def name(index):
             return f'/{self.DEV}/_ao{index}_vs_aognd'
@@ -393,24 +452,27 @@ class NIDAQ(BaseEquipment):
         :class:`float`
             The standard deviation.
         """
-        cps = np.full((repeat,), np.nan, dtype=np.float)
+        cps = np.full((repeat,), np.nan, dtype=np.int)
         duration = float(duration)
 
         # using a Counter Output task as a gate for the Counter Input task
         edge = self.Edge.RISING if rising else self.Edge.FALLING
 
-        # add a small delay to make sure that the CI task has started and is waiting for the CO gate pulse
+        # add a small delay to make sure that the CI task has started and
+        # is waiting for the CO gate pulse
         co_task_delay = 0.01
 
+        ctr_src = 0
+        ctr_gate = 1
+
+        self.logger.info(f'{self.alias!r} start counting edges ...')
+
         for index in range(repeat):
-            with self.Task() as co_task:
+            with self.Task() as co_task, self.Task() as ci_task:
                 co_task.co_channels.add_co_pulse_chan_time(
-                    # if the channel is changed then also update Ctr1InternalOutput below
-                    f'/{self.DEV}/ctr1',
+                    f'/{self.DEV}/ctr{ctr_gate}',
                     high_time=duration,
-                    # The value of low_time shouldn't matter and that is why it is made to be large.
-                    # It doesn't matter since Implicit Timing is FINITE with 1 sample and
-                    # because idle_state=LOW the CO task finishes after high_time seconds.
+                    # The value of low_time doesn't matter and that is why it is large
                     low_time=1000.,
                     idle_state=self.Level.LOW,
                     initial_delay=co_task_delay,
@@ -419,44 +481,49 @@ class NIDAQ(BaseEquipment):
                     sample_mode=self.AcquisitionType.FINITE,
                     samps_per_chan=1,
                 )
-                with self.Task() as ci_task:
-                    # create the Counter Input channel
-                    channel = ci_task.ci_channels.add_ci_count_edges_chan(
-                        f'/{self.DEV}/ctr0',
-                        edge=edge,
-                        initial_count=0,
-                        count_direction=self.CountDirection.COUNT_UP
-                    )
-                    # let the channel know which PFI port has the input signal attached to it
-                    channel.ci_count_edges_term = f'/{self.DEV}/PFI{pfi}'
-                    # only increment the value when the ctr1 output counter is TTL high
-                    ci_task.triggers.pause_trigger.trig_type = self.TriggerType.DIGITAL_LEVEL
-                    ci_task.triggers.pause_trigger.dig_lvl_when = self.Level.LOW
-                    # the digital level source is internally connected to the CO task output -> ctr1
-                    ci_task.triggers.pause_trigger.dig_lvl_src = f'/{self.DEV}/Ctr1InternalOutput'
 
-                    # must start the CI task before the CO task
-                    ci_task.start()
-                    co_task.start()
-                    co_task.wait_until_done(timeout=duration + co_task_delay + 1.0)
-                    count = channel.ci_count
-                    self.logger.info(f'{self.alias!r} counted {count} {edge.name} edges in {duration} second(s)')
-                    cps[index] = count / duration
+                channel = ci_task.ci_channels.add_ci_count_edges_chan(
+                    f'/{self.DEV}/ctr{ctr_src}',
+                    edge=edge,
+                    initial_count=0,
+                    count_direction=self.CountDirection.COUNT_UP
+                )
+                # redirect the CI channel to the PFI terminal that has the
+                # input signal connected to it
+                channel.ci_count_edges_term = f'/{self.DEV}/PFI{pfi}'
 
-        ave, stdev = ave_std(cps)
+                # only increment the counter when the gate output is HIGH
+                pt = ci_task.triggers.pause_trigger
+                pt.trig_type = self.TriggerType.DIGITAL_LEVEL
+                pt.dig_lvl_when = self.Level.LOW
+                # the digital level source is internally connected to the CO task output
+                pt.dig_lvl_src = f'/{self.DEV}/Ctr{ctr_gate}InternalOutput'
+
+                # must start the CI task before the CO task
+                ci_task.start()
+                co_task.start()
+                co_task.wait_until_done(timeout=duration + co_task_delay + 5.0)
+                count = channel.ci_count
+                cps[index] = count / duration
+
+        self.logger.info(f'{self.alias!r} counted {cps} {edge.name} edges/second '
+                         f'within {duration}-second intervals')
+
+        ave, stdev = ave_std(cps.astype(float))
         self.counts_changed.emit(ave, stdev)
         self.emit_notification(ave, stdev)
         return ave, stdev
 
     def digital_in(self,
-                   line: Union[int, str], *,
+                   lines: Union[int, str], *,
                    port: int = 1) -> Union[bool, List[bool]]:
         """Read the state of the digital-input channel(s).
 
         Parameters
         ----------
-        line : :class:`int` or :class:`str`
-            The line number(s) (e.g., line=1, line='0:7').
+        lines : :class:`int` or :class:`str`
+            The line number(s) (e.g., line=1, line='0:7',
+            line='/Dev1/port0/line0:7,/Dev1/port1/line0:3').
         port : :class:`int`, optional
             The port number.
 
@@ -468,48 +535,50 @@ class NIDAQ(BaseEquipment):
         Examples
         --------
         Read the state of a single digital-input channel (P1.0)
-        >>> digital_in(0)
+        >>> daq.digital_in(0)
         False
 
         Read the state of a single digital-input channel (P0.2)
-        >>> digital_in(2, port=0)
+        >>> daq.digital_in(2, port=0)
         True
 
         Read the state of multiple digital-input channels (P1.0-7)
-        >>> digital_in('0:7')
+        >>> daq.digital_in('0:7')
         [False, False, True, False, False, False, False, True]
         """
         with self.Task() as task:
             task.di_channels.add_di_chan(
-                f'/{self.DEV}/port{port}/line{line}',
+                self._generate_digital_lines(lines, port),
                 line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE
             )
             return task.read()
 
     def digital_out(self,
-                    line: Union[int, str],
+                    lines: Union[int, str],
                     state: Union[bool, List[bool], List[List[bool]]], *,
                     port: int = 1,
-                    rate: float = 1000,
                     timeout: float = 10,
+                    timing: Timing = None,
+                    trigger: Trigger = None,
                     wait: bool = True) -> nidaqmx.Task:
         """Write the state of digital-output channels(s).
 
         Parameters
         ----------
-        line : :class:`int` or :class:`str`
-            The line number(s) (e.g., line=1, line='0:7').
+        lines : :class:`int` or :class:`str`
+            The line number(s) (e.g., line=1, line='0:7',
+            line='/Dev1/port0/line0:7,/Dev1/port1/line0:3').
         state : :class:`bool` or :class:`list` of :class:`bool`
             Whether to set the specified line(s) to HIGH or LOW.
         port : :class:`int`, optional
             The port number.
-        rate : :class:`float`, optional
-            The sample rate in Hz. The specified `line` must support
-            buffered operations otherwise an exception will be raised. For a
-            NI USB-6361 device, the available buffered lines are in port=0.
         timeout : :class:`float`, optional
             The maximum number of seconds to wait for the task to finish.
             Set to -1 to wait forever.
+        timing : :class:`.Timing`, optional
+            The timing settings to use. See :meth:`.timing`.
+        trigger : :class:`.Trigger`, optional
+            The trigger settings to use. See :meth:`.trigger`.
         wait : :class:`bool`, optional
             Whether to wait for the task to finish. If enabled then also
             closes the task when it is finished.
@@ -522,40 +591,43 @@ class NIDAQ(BaseEquipment):
         Examples
         --------
         Set the state of a single digital-output channel (P1.0)
-        >>> digital_out(0, True)
+        >>> daq.digital_out(0, True)
 
         Set multiple digital-output channels to be in the same state (P2.0-7)
-        >>> digital_out('0:7', False, port=2)
+        >>> daq.digital_out('0:7', False, port=2)
 
         Set the state of multiple digital-output channels (P1.2-4)
-        >>> digital_out('2:4', [False, True, True])
-
-        Set an output sequence on a single channel (P0.0). Each state is written every 0.1 ms
-        >>> digital_out(0, [True, False, False, True, False, False, False, True, True, False], port=0, rate=10)
+        >>> daq.digital_out('2:4', [False, True, True])
         """
-        lines = f'/{self.DEV}/port{port}/line{line}'
+        lines = self._generate_digital_lines(lines, port)
+
         task = self.Task()
         self._tasks.append(task)
-        task.do_channels.add_do_chan(lines, line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE)
 
-        samps_per_chan = 1
+        task.do_channels.add_do_chan(
+            lines,
+            line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE
+        )
+
+        n = 1
         num_channels = task.number_of_channels
         if isinstance(state, bool):
             if num_channels > 1:
                 state = [state] * num_channels
         elif num_channels == 1:
-            samps_per_chan = len(state)
+            n = len(state)
         elif isinstance(state[0], (list, tuple)):
-            samps_per_chan = len(state[0])
+            n = len(state[0])
 
-        if samps_per_chan > 1:
-            self.logger.info(f'{self.alias!r} set digital-output timing to {rate} Hz '
-                             f'with {samps_per_chan} samples/channel')
-            task.timing.cfg_samp_clk_timing(rate, samps_per_chan=samps_per_chan)
+        if timing is None:
+            timing = self.timing()
+        timing.samples_per_channel = n
+
+        self._maybe_set_timing_and_trigger(task, timing, trigger, 'digital-output')
 
         self.logger.info(f'{self.alias!r} set {lines} to {state}')
         written = task.write(state, auto_start=True, timeout=timeout)
-        assert written == samps_per_chan
+        assert written == n
         if wait:
             try:
                 task.wait_until_done(timeout=timeout)
@@ -565,14 +637,15 @@ class NIDAQ(BaseEquipment):
         return task
 
     def digital_out_read(self,
-                         line: Union[int, str], *,
+                         lines: Union[int, str], *,
                          port: int = 1) -> Union[bool, List[bool]]:
         """Read the state of digital-output channel(s).
 
         Parameters
         ----------
-        line : :class:`int` or :class:`str`
-            The line number(s) (e.g., line=1, line='0:7').
+        lines : :class:`int` or :class:`str`
+            The line number(s) (e.g., line=1, line='0:7',
+            line='/Dev1/port0/line0:7,/Dev1/port1/line0:3').
         port : :class:`int`, optional
             The port number.
 
@@ -584,20 +657,20 @@ class NIDAQ(BaseEquipment):
         Examples
         --------
         Read the state of a single digital-output channel (P1.0)
-        >>> digital_out_read(0)
+        >>> daq.digital_out_read(0)
         True
 
         Read the state of a single digital-output channel (P0.5)
-        >>> digital_out_read(5, port=0)
+        >>> daq.digital_out_read(5, port=0)
         False
 
         Read the state of multiple digital-output channels (P1.0-7)
-        >>> digital_out_read('0:7')
+        >>> daq.digital_out_read('0:7')
         [False, True, True, False, True, False, False, False]
         """
         with self.Task() as task:
             task.do_channels.add_do_chan(
-                f'/{self.DEV}/port{port}/line{line}',
+                self._generate_digital_lines(lines, port),
                 line_grouping=NIDAQ.LineGrouping.CHAN_PER_LINE
             )
             return task.read()
@@ -650,7 +723,7 @@ class NIDAQ(BaseEquipment):
         Examples
         --------
         Generate a single HIGH pulse for 0.1 seconds from PFI2
-        >>> pulse(2, 0.1)
+        >>> daq.pulse(2, 0.1)
         """
         if state:
             idle_state, state_str = self.Level.LOW, 'HIGH'
@@ -672,8 +745,8 @@ class NIDAQ(BaseEquipment):
                 sample_mode=self.AcquisitionType.FINITE,
                 samps_per_chan=npulses,
             )
-        self.logger.info(f'{self.alias!r} generating {npulses} {state_str} pulse(s) '
-                         f'after {delay} second(s)')
+        self.logger.info(f'{self.alias!r} generating {npulses} {state_str} '
+                         f'pulse(s) after {delay} second(s)')
         task.start()
         if wait:
             try:
@@ -683,22 +756,106 @@ class NIDAQ(BaseEquipment):
                 self._tasks.remove(task)
         return task
 
-    def trigger(self, channel: int, **kwargs) -> Trigger:
-        """Create a new :class:`.Trigger` instance.
+    def storm(self, camera: int, sequence: dict) -> nidaqmx.Task:
+        """Create a task for STORM/PALM acquisition.
+
+        Parameters
+        ----------
+        camera : :class:`int`
+            The PFI terminal number that the camera's Fire signal is connect to.
+        sequence : dict
+            The keys are the digital-output terminals that turn the laser
+            pulses on/off and the values represent the state of the lasers
+            in each frame, e.g., for a 4-frame sequence controlling two lasers:
+
+            sequence = {
+                'port0/line0': [True, False, False, False],
+                'port0/line1': [False, True, True, True]
+            }
+
+        Returns
+        -------
+        :class:`nidaqmx.Task`
+            The task.
+        """
+        lines = ','.join(f'/{self.DEV}/{key}' for key in sequence)
+        data = [value for value in sequence.values()]
+        timing = self.timing(
+            rate=10000,  # maximum expected rate of the camera's Fire signal
+            finite=False,
+            rising=False,
+            pfi=camera
+        )
+        timing.samples_per_channel = len(data[0])
+        return self.digital_out(lines, data, timing=timing, wait=False)
+
+    def timing(self, *,
+               finite: bool = True,
+               pfi: int = None,
+               rate: float = 1000,
+               rising: bool = True) -> Timing:
+        """Configure the sample clock to add to a task.
+
+        Parameters
+        ----------
+        finite : :class:`bool`, optional
+            Whether to acquire/generate a continuous or a finite number of samples.
+        pfi : :class:`int`, optional
+            The PFI terminal number to use as the external sample clock.
+            If not specified then uses the default onboard clock of the device.
+        rate : :class:`float`, optional
+            The sampling rate in Hz. If you specify an external sample clock
+            (i.e., a value for `pfi`) then set the `rate` to be the maximum
+            expected rate of the external clock.
+        rising : :class:`bool`, optional
+            Whether to acquire/generate samples on the rising or falling edge
+            of the sample clock.
+        """
+        source = '' if pfi is None else f'/{self.DEV}/PFI{pfi}'
+        return Timing(finite=finite, source=source, rate=rate, rising=rising)
+
+    def trigger(self,
+                channel: int, *,
+                delay: float = 0,
+                hysteresis: float = 0,
+                level: float = None,
+                retriggerable: bool = False,
+                rising: bool = True) -> Trigger:
+        """Configure a trigger to add to a task.
 
         Parameters
         ----------
         channel : :class:`int`
             Either a PFI or an AI channel number to use as the trigger source.
-        kwargs
-            All additional keyword arguments are passed to :class:`.Trigger`.
+        delay : :class:`float`, optional
+            The time (in seconds) between the trigger event and when to
+            acquire/generate samples. Can be < 0 to acquire/generate samples
+            before the trigger event (only if the NIDAQ task supports it).
+        hysteresis : :class:`float`, optional
+            A hysteresis level (in volts). Only applicable for an analog trigger.
+        level : :class:`float`, optional
+            The voltage level to use for the trigger signal. Whether this value
+            is set decides whether the trigger source is from a digital or an
+            analog channel. If :data:`None` then `channel` refers to a PFI
+            channel (a digital trigger), otherwise, `channel` refers to an
+            AI channel (an analog trigger).
+        retriggerable : :class:`bool`, optional
+            Whether the task can be retriggered.
+        rising : :class:`bool`, optional
+            Whether to use the rising or falling edge(slope) of the
+            digital(analog) trigger signal.
 
         Returns
         -------
         :class:`.Trigger`
-            The trigger settings.
+            The trigger instance.
         """
-        return Trigger(channel, self.DEV, **kwargs)
+        if level is None:
+            source = f'/{self.DEV}/PFI{channel}'
+        else:
+            source = f'/{self.DEV}/APFI{channel}'
+        return Trigger(source=source, delay=delay, hysteresis=hysteresis,
+                       level=level, retriggerable=retriggerable, rising=rising)
 
     @staticmethod
     def time_array(dt: float, n: Union[int, np.ndarray]) -> np.ndarray:
@@ -735,3 +892,24 @@ class NIDAQ(BaseEquipment):
         for task in tasks:
             task.wait_until_done(timeout=timeout)
             task.close()
+
+    def _maybe_set_timing_and_trigger(self,
+                                      task: nidaqmx.Task,
+                                      timing: Timing,
+                                      trigger: Trigger,
+                                      task_type: str) -> None:
+        """(Maybe) Configure timing and triggering for a task."""
+        if timing.samples_per_channel > 1 or \
+                timing.sample_mode == NIDAQ.AcquisitionType.CONTINUOUS or \
+                trigger is not None:
+            self.logger.info(f'{self.alias!r} set {timing} for the {task_type} task')
+            timing.add_to(task)
+
+        if trigger is not None:
+            self.logger.info(f'{self.alias!r} set {trigger} for the {task_type} task')
+            trigger.add_to(task)
+
+    def _generate_digital_lines(self, lines, port) -> str:
+        if isinstance(lines, str) and lines.startswith(f'/{self.DEV}'):
+            return lines
+        return f'/{self.DEV}/port{port}/line{lines}'

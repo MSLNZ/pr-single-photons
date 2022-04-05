@@ -2,7 +2,10 @@
 Test that photons/equipment/nidaq.py is working properly.
 """
 import math
-from time import perf_counter
+from time import (
+    perf_counter,
+    sleep,
+)
 
 import numpy as np
 import pytest
@@ -47,6 +50,11 @@ for port in [0, 1, 2]:
     for i in range(8):
         assert daq.digital_out_read(i, port=port) is False
 
+
+lines = f'/{daq.DEV}/port0/line0:7,/{daq.DEV}/port1/line0:7,/{daq.DEV}/port2/line0:7'
+daq.digital_out(lines, False)
+assert daq.digital_out_read(lines) == [False] * (3 * 8)
+
 #
 # Digital Input
 #
@@ -55,6 +63,7 @@ assert daq.digital_in(0, port=0) is False
 assert daq.digital_in(0, port=2) is False
 assert daq.digital_in('3:5') == [False] * 3
 assert daq.digital_in('0:7') == [False] * 8
+assert daq.digital_in(lines) == [False] * (3 * 8)
 
 #
 # Analog Input
@@ -63,25 +72,39 @@ data, dt = daq.analog_in(0)
 assert data.shape == (1,)
 assert dt == 0.001
 
-data, dt = daq.analog_in(0, nsamples=2, rate=10)
+data, dt = daq.analog_in(0, nsamples=2, timing=daq.timing(rate=10))
 assert data.shape == (2,)
 assert dt == 0.1
 
 # only 1 sample is acquired, so the `rate` keyword argument is ignored
-data, dt = daq.analog_in('0:3', rate=1)
+data, dt = daq.analog_in('0:3', timing=daq.timing(rate=1))
 assert data.shape == (4, 1)
 assert dt == 0.001
 
-data, dt = daq.analog_in('0:3', nsamples=2, rate=100e3)
+data, dt = daq.analog_in('0:3', nsamples=2, timing=daq.timing(rate=100e3))
 assert data.shape == (4, 2)
 assert dt == 1e-5
 
-data, dt = daq.analog_in('0:7', duration=1, rate=100)
-assert data.shape == (8, 100)
+data, dt = daq.analog_in('0:7', duration=1, timing=daq.timing(rate=100))
+assert data.shape == (8, 100), data.shape
 assert dt == 0.01
 x = np.asarray([i*dt for i in range(100)])
 x2 = daq.time_array(dt, 100)
 assert np.array_equal(x, x2)
+
+
+# register a callback
+def ai_callback(task_handle, every_n_samples_event_type, number_of_samples, callback_data):
+    app.logger.info(f'AI callback: {task.read(number_of_samples_per_channel=number_of_samples)}')
+    return 0
+
+
+task, dt = daq.analog_in(0, timing=daq.timing(finite=False), wait=False)
+task.register_every_n_samples_acquired_into_buffer_event(5, ai_callback)
+task.start()
+sleep(1)
+task.stop()
+daq.close_all_tasks()
 
 #
 # Analog Output (the analog_out method has an internal assert statement)
@@ -95,11 +118,11 @@ daq.analog_out('0:1', [0., 0.])
 daq.analog_out('0:1', [[-0.2, -0.1, 0., 0.1, 0.2], [0.2, 0.1, 0., -0.1, -0.2]])
 
 t0 = perf_counter()
-daq.analog_out('0', [0., 0.1, 0.2], rate=1)
+daq.analog_out('0', [0., 0.1, 0.2], timing=daq.timing(rate=1))
 assert perf_counter() - t0 > 2.0
 
 values = np.sin(np.linspace(0, 2*np.pi, 1000))
-daq.analog_out(0, values, rate=1e5)
+daq.analog_out(0, values, timing=daq.timing(rate=1e5))
 
 daq.analog_out('0:1', [0., 0.])
 
@@ -142,7 +165,7 @@ assert values.shape == (1,)
 assert values[0] == pytest.approx(0.21, abs=0.005)
 
 
-values, dt = daq.analog_out_read(0, nsamples=10, rate=10)
+values, dt = daq.analog_out_read(0, nsamples=10, timing=daq.timing(rate=10))
 assert dt == 0.1
 assert values.shape == (10,)
 for value in values:
@@ -154,7 +177,7 @@ assert values.shape == (100,)
 for value in values:
     assert value == pytest.approx(0.21, abs=0.005)
 
-values, dt = daq.analog_out_read('0:1', nsamples=5, rate=1e5)
+values, dt = daq.analog_out_read('0:1', nsamples=5, timing=daq.timing(rate=1e5))
 assert dt == 0.00001
 assert values.shape == (2, 5)
 for value in values[0, :]:
@@ -271,5 +294,15 @@ with pytest.raises(DaqError, match=message):
 with pytest.raises(DaqError, match=message):
     daq.analog_out(0, [0, 0], timeout=1, trigger=daq.trigger(0, delay=0.1))
 
+#
+# STORM/PALM
+#
+sequence = {
+    'port0/line0': [True, False, False, False],
+    'port0/line1': [False, True, True, True]
+}
+task = daq.storm(0, sequence=sequence)
+sleep(1)
+daq.close_all_tasks()
 
 app.disconnect_equipment()
