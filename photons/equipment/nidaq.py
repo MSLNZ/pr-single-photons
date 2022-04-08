@@ -172,6 +172,11 @@ class NIDAQ(BaseEquipment):
     Level = nidaqmx.constants.Level
     LineGrouping = nidaqmx.constants.LineGrouping
     TerminalConfiguration = nidaqmx.constants.TerminalConfiguration
+    TimeUnits = nidaqmx.constants.TimeUnits
+
+    AnalogSingleChannelReader = nidaqmx.stream_readers.AnalogSingleChannelReader
+    AnalogMultiChannelReader = nidaqmx.stream_readers.AnalogMultiChannelReader
+    CounterReader = nidaqmx.stream_readers.CounterReader
 
     counts_changed = Signal(float, float)  # (average, stdev)
 
@@ -286,15 +291,25 @@ class NIDAQ(BaseEquipment):
 
         dt = 1.0 / task.timing.samp_clk_rate
         if wait:
+            samples_per_channel = timing.samples_per_channel
+            num_channels = task.number_of_channels
+            if num_channels == 1:
+                data = np.empty((samples_per_channel,), dtype=float)
+                reader = NIDAQ.AnalogSingleChannelReader(task.in_stream)
+            else:
+                data = np.empty((num_channels, samples_per_channel), dtype=float)
+                reader = NIDAQ.AnalogMultiChannelReader(task.in_stream)
             try:
-                data = task.read(
-                    number_of_samples_per_channel=timing.samples_per_channel,
-                    timeout=timeout
+                reader.read_many_sample(
+                    data,
+                    number_of_samples_per_channel=samples_per_channel,
+                    timeout=timeout,
                 )
+                task.read()
             finally:
                 task.close()
                 self._tasks.remove(task)
-            return np.asarray(data), dt
+            return data, dt
         return task, dt
 
     def analog_out(self,
