@@ -2,8 +2,11 @@
 Base class for a digital multimeter.
 """
 import numpy as np
-from msl.qt import Signal
 from msl.equipment import Backend
+from msl.qt import (
+    Signal,
+    MICRO,
+)
 
 from . import BaseEquipment
 from ..utils import ave_std
@@ -42,9 +45,9 @@ class DMM(BaseEquipment):
         '10 V': 10.0,
         '100 V': 100.0,
         '1000 V': 1000.0,
-        '1 \u00b5A': 1e-6,
-        '10 \u00b5A': 10e-6,
-        '100 \u00b5A': 100e-6,
+        f'1 {MICRO}A': 1e-6,
+        f'10 {MICRO}A': 10e-6,
+        f'100 {MICRO}A': 100e-6,
         '1 uA': 1e-6,
         '10 uA': 10e-6,
         '100 uA': 100e-6,
