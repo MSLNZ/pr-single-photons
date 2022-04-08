@@ -2,7 +2,6 @@
 Custom implementations for the Thorlabs Kinesis SDK.
 """
 import time
-from typing import Union
 
 from msl.qt import (
     QtCore,
@@ -134,11 +133,11 @@ class KinesisBase(BaseEquipment):
         """Return a :class:`dict` about the relevant information about the device."""
         return self._info
 
-    def get_position(self) -> Union[int, float]:
+    def get_position(self) -> int | float:
         """Get the current position of the device."""
         raise NotImplementedError
 
-    def set_position(self, position: Union[int, float]):
+    def set_position(self, position: int | float):
         """Set the current position of the device."""
         raise NotImplementedError
 

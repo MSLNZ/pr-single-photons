@@ -3,7 +3,6 @@ Communicate with a DAQ from National Instruments.
 """
 import warnings
 from typing import (
-    Union,
     List,
     Tuple,
 )
@@ -194,8 +193,8 @@ class NIDAQ(BaseEquipment):
         self._tasks = []
 
     def analog_in(self,
-                  channel: Union[int, str], *,
-                  config: Union[int, str] = 'BAL_DIFF',
+                  channel: int | str, *,
+                  config: int | str = 'BAL_DIFF',
                   duration: float = None,
                   maximum: float = 10,
                   minimum: float = -10,
@@ -203,7 +202,7 @@ class NIDAQ(BaseEquipment):
                   timeout: float = 10,
                   timing: Timing = None,
                   trigger: Trigger = None,
-                  wait: bool = True) -> Tuple[Union[np.ndarray, nidaqmx.Task], float]:
+                  wait: bool = True) -> Tuple[np.ndarray | nidaqmx.Task, float]:
         """Read the voltage(s) of the analog-input channel(s).
 
         Parameters
@@ -299,8 +298,8 @@ class NIDAQ(BaseEquipment):
         return task, dt
 
     def analog_out(self,
-                   channel: Union[int, str],
-                   voltage: Union[float, List[float], List[List[float]], np.ndarray], *,
+                   channel: int | str,
+                   voltage: float | List[float] | List[List[float]] | np.ndarray, *,
                    timeout: float = 10,
                    timing: Timing = None,
                    trigger: Trigger = None,
@@ -372,8 +371,8 @@ class NIDAQ(BaseEquipment):
                 self._tasks.remove(task)
         return task
 
-    def analog_out_read(self, channel: Union[int, str], **kwargs) -> \
-            Tuple[Union[np.ndarray, nidaqmx.Task], float]:
+    def analog_out_read(self, channel: int | str, **kwargs) -> \
+            Tuple[np.ndarray | nidaqmx.Task, float]:
         """Read the output voltage(s) from the analog-output channel(s).
 
         Parameters
@@ -515,8 +514,8 @@ class NIDAQ(BaseEquipment):
         return ave, stdev
 
     def digital_in(self,
-                   lines: Union[int, str], *,
-                   port: int = 1) -> Union[bool, List[bool]]:
+                   lines: int | str, *,
+                   port: int = 1) -> bool | List[bool]:
         """Read the state of the digital-input channel(s).
 
         Parameters
@@ -554,8 +553,8 @@ class NIDAQ(BaseEquipment):
             return task.read()
 
     def digital_out(self,
-                    lines: Union[int, str],
-                    state: Union[bool, List[bool], List[List[bool]]], *,
+                    lines: int | str,
+                    state: bool | List[bool] | List[List[bool]], *,
                     port: int = 1,
                     timeout: float = 10,
                     timing: Timing = None,
@@ -637,8 +636,8 @@ class NIDAQ(BaseEquipment):
         return task
 
     def digital_out_read(self,
-                         lines: Union[int, str], *,
-                         port: int = 1) -> Union[bool, List[bool]]:
+                         lines: int | str, *,
+                         port: int = 1) -> bool | List[bool]:
         """Read the state of digital-output channel(s).
 
         Parameters
@@ -858,7 +857,7 @@ class NIDAQ(BaseEquipment):
                        level=level, retriggerable=retriggerable, rising=rising)
 
     @staticmethod
-    def time_array(dt: float, n: Union[int, np.ndarray]) -> np.ndarray:
+    def time_array(dt: float, n: int | np.ndarray) -> np.ndarray:
         """Create an array based on a sampling time.
 
         Parameters

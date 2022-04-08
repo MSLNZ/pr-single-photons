@@ -1,7 +1,6 @@
 """Logging configuration."""
 import os
 import logging
-from typing import Union
 
 
 def set_block(*names: str) -> None:
@@ -28,7 +27,7 @@ def set_info(*names: str) -> None:
         set_level(name, logging.INFO)
 
 
-def set_level(name: str, level: Union[int, str]) -> None:
+def set_level(name: str, level: int | str) -> None:
     """Set the logging level for a particular logger."""
     logging.getLogger(name).setLevel(level)
 
