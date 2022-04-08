@@ -24,8 +24,15 @@ def device(alias, message):
         The application instance and the connection class to the device.
     """
     app = App(r'D:\config.xml')
-    dev = app.connect_equipment(alias)
+
+    try:
+        dev = app.connect_equipment(alias)
+    except Exception as e:
+        prompt.critical(str(e))
+        sys.exit()
+
     if not prompt.yes_no(f'{message}\n\n{dev.record!r}'):
         app.disconnect_equipment()
         sys.exit()
+
     return app, dev
