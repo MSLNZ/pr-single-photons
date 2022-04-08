@@ -689,6 +689,76 @@ class NIDAQ(BaseEquipment):
             )
             return task.read()
 
+    def edge_separation(self,
+                        start: int,
+                        stop: int, *,
+                        maximum: float = 1.0,
+                        minimum: float = 100e-9,
+                        nsamples: int = 10,
+                        start_edge: int | str = 'RISING',
+                        stop_edge: int | str = 'FALLING',
+                        timeout: float = 10) -> np.ndarray:
+        """Get the duration, in seconds, between two edges.
+
+        Parameters
+        ----------
+        start : :class:`int`
+            The PFI terminal number to use for the start time, t=0.
+        stop : :class:`int`
+            The PFI terminal number to use for the stop time, t=dt.
+            Can be same as `start` provided that `start_edge` and `stop_edge`
+            are different values.
+        maximum : :class:`float`, optional
+            The maximum time, in seconds, between the start-stop edges that
+            is expected.
+        minimum : :class:`float`, optional
+            The minimum time, in seconds, between the start-stop edges that
+            is expected.
+        nsamples : :class:`int`, optional
+            The number of start-stop samples to acquire.
+        start_edge : :class:`int` or :class:`str`, optional
+            Specifies on which edge to start each measurement.
+            See :class:`~nidaqmx.constants.Edge` for allowed values.
+        stop_edge : :class:`int` or :class:`str`, optional
+            Specifies on which edge to stop each measurement.
+            See :class:`~nidaqmx.constants.Edge` for allowed values.
+        timeout : :class:`float`, optional
+            The maximum number of seconds to wait for the task to finish.
+            Set to -1 to wait forever.
+
+        Returns
+        -------
+        :class:`numpy.ndarray`
+            The duration, in seconds, between the start-stop edges.
+        """
+        first_edge = self.convert_to_enum(start_edge, NIDAQ.Edge, to_upper=True)
+        second_edge = self.convert_to_enum(stop_edge, NIDAQ.Edge, to_upper=True)
+        data = np.empty((nsamples,), dtype=float)
+        with self.Task() as task:
+            channel = task.ci_channels.add_ci_two_edge_sep_chan(
+                f'/{self.DEV}/ctr0',
+                min_val=minimum,
+                max_val=maximum,
+                units=NIDAQ.TimeUnits.SECONDS,
+                first_edge=first_edge,
+                second_edge=second_edge
+            )
+            channel.ci_two_edge_sep_first_term = f'/{self.DEV}/PFI{start}'
+            channel.ci_two_edge_sep_second_term = f'/{self.DEV}/PFI{stop}'
+
+            task.timing.cfg_implicit_timing(
+                sample_mode=NIDAQ.AcquisitionType.CONTINUOUS,
+                samps_per_chan=2*nsamples  # the buffer size
+            )
+
+            reader = NIDAQ.CounterReader(task.in_stream)
+            reader.read_many_sample_double(
+                data,
+                number_of_samples_per_channel=nsamples,
+                timeout=timeout,
+            )
+            return data
+
     def pulse(self,
               pfi: int,
               duration: float, *,

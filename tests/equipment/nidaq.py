@@ -305,4 +305,19 @@ task = daq.storm(0, sequence=sequence)
 sleep(1)
 daq.close_all_tasks()
 
+
+#
+# Edge separation
+#
+message = r'Cannot measure two-edge separation with both the first and second terminal set to the same signal'
+with pytest.raises(DaqError, match=message):
+    daq.edge_separation(0, 0, stop_edge='rising', timeout=1)
+
+message = r'Some or all of the samples requested have not yet been acquired'
+with pytest.raises(DaqError, match=message):
+    daq.edge_separation(0, 1, timeout=1)
+with pytest.raises(DaqError, match=message):
+    daq.edge_separation(0, 1, start_edge='rising', stop_edge=daq.Edge.RISING, timeout=1)
+
+
 app.disconnect_equipment()
