@@ -7,15 +7,17 @@ import os
 import sys
 from datetime import datetime
 
+import numpy as np
 import requests
 from msl.equipment import Config
 from msl.qt import (
     application,
     excepthook,
     convert,
-    QtCore,
-    Signal,
     prompt,
+    Signal,
+    QtCore,
+    QtWidgets
 )
 from msl.network.client import Link
 from msl.network import connect
@@ -462,28 +464,35 @@ class App(QtCore.QObject):
         return PhotonWriter(path, app=self)
 
     @staticmethod
-    def plot(file=None, block=True, **kwargs):
+    def plot(data: str | np.ndarray | Root = None,
+             block: bool = True,
+             **kwargs) -> QtWidgets.QApplication:
         """Show the plot widget.
 
         Parameters
         ----------
-        file : :class:`str` or :class:`~msl.io.base_io.Root`, optional
-            A file to read data from. If not specified an emtpy widget is returned.
+        data : :class:`str`, :class:`~numpy.ndarray` or :class:`~msl.io.base_io.Root`, optional
+            The data to initially plot. If a :class:`str` then the value is a file path.
+            If not specified then an emtpy widget is returned.
         block : :class:`bool`, optional
             Whether to block until the application is closed.
         kwargs
-            All keyword arguments are passed to :func:`~msl.io.read`.
+            If `data` is a filename then all keyword arguments are passed
+            to :func:`~msl.io.read`.
 
         Returns
         -------
-        :class:`.App`
+        :class:`~QtWidgets.QApplication`
             The application instance.
         """
         from .gui.plotting import Plot, windows
-        if isinstance(file, str):
-            root = read(file, **kwargs)
-        elif isinstance(file, Root):
-            root = file
+        if isinstance(data, str):
+            root = read(data, **kwargs)
+        elif isinstance(data, Root):
+            root = data
+        elif isinstance(data, np.ndarray):
+            root = Root('ndarray')
+            root.create_dataset('data', data=data)
         else:
             root = None
         app = application()
