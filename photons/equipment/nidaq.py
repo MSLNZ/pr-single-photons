@@ -447,7 +447,7 @@ class NIDAQ(BaseEquipment):
     def count_edges(self,
                     pfi: int,
                     duration: float, *,
-                    repeat: int = 1,
+                    nsamples: int = 1,
                     rising: bool = True) -> Tuple[float, float]:
         """Count the number of edges per second.
 
@@ -457,8 +457,8 @@ class NIDAQ(BaseEquipment):
             The PFI terminal number that has the input signal connected to it.
         duration : :class:`float`
             The number of seconds to count edges for.
-        repeat : :class:`int`, optional
-            The number of times to repeat the measurement.
+        nsamples : :class:`int`, optional
+            The number of times to count edges for `duration` seconds.
         rising : :class:`bool`, optional
             If :data:`True` then count rising edges, otherwise count falling edges.
 
@@ -469,8 +469,7 @@ class NIDAQ(BaseEquipment):
         :class:`float`
             The standard deviation.
         """
-        cps = np.full((repeat,), np.nan, dtype=np.int)
-        duration = float(duration)
+        cps = np.full((nsamples,), np.nan, dtype=np.int)
 
         # using a Counter Output task as a gate for the Counter Input task
         edge = self.Edge.RISING if rising else self.Edge.FALLING
@@ -484,7 +483,7 @@ class NIDAQ(BaseEquipment):
 
         self.logger.info(f'{self.alias!r} start counting edges ...')
 
-        for index in range(repeat):
+        for index in range(nsamples):
             with self.Task() as co_task, self.Task() as ci_task:
                 co_task.co_channels.add_co_pulse_chan_time(
                     f'/{self.DEV}/ctr{ctr_gate}',
@@ -523,8 +522,9 @@ class NIDAQ(BaseEquipment):
                 count = channel.ci_count
                 cps[index] = count / duration
 
-        self.logger.info(f'{self.alias!r} counted {cps} {edge.name} edges/second '
-                         f'within {duration}-second intervals')
+        self.logger.info(
+            f'{self.alias!r} counted {np.array2string(cps, max_line_width=1000)} '
+            f'{edge.name} edges/second in {duration}-second intervals')
 
         ave, stdev = ave_std(cps.astype(float))
         self.counts_changed.emit(ave, stdev)
