@@ -836,7 +836,7 @@ class NIDAQ(BaseEquipment):
                 samps_per_chan=npulses,
             )
         self.logger.info(f'{self.alias!r} generating {npulses} {state_str} '
-                         f'pulse(s) after {delay} second(s)')
+                         f'pulse(s) [duration={duration}, delay={delay}]')
         task.start()
         if wait:
             try:
