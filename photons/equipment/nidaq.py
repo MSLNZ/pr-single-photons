@@ -315,6 +315,7 @@ class NIDAQ(BaseEquipment):
     def analog_out(self,
                    channel: int | str,
                    voltage: float | List[float] | List[List[float]] | np.ndarray, *,
+                   auto_start: bool = True,
                    timeout: float = 10,
                    timing: Timing = None,
                    trigger: Trigger = None,
@@ -327,6 +328,8 @@ class NIDAQ(BaseEquipment):
             The analog-output channel number(s) (e.g., channel=0, channel='0:1').
         voltage : :class:`float`, :class:`list` or :class:`~numpy.ndarray`
             The voltage(s) to output.
+        auto_start : :class:`bool`, optional
+            Whether to automatically start the task.
         timeout : :class:`float`, optional
             The maximum number of seconds to wait for the task to finish.
             Set to -1 to wait forever.
@@ -376,7 +379,7 @@ class NIDAQ(BaseEquipment):
 
         self.logger.info(f'{self.alias!r} set {ao} with {array.shape} samples')
 
-        written = task.write(array, auto_start=True, timeout=timeout)
+        written = task.write(array, auto_start=auto_start, timeout=timeout)
         assert written == timing.samples_per_channel
         if wait:
             try:
@@ -570,6 +573,7 @@ class NIDAQ(BaseEquipment):
     def digital_out(self,
                     lines: int | str,
                     state: bool | List[bool] | List[List[bool]], *,
+                    auto_start: bool = True,
                     port: int = 1,
                     timeout: float = 10,
                     timing: Timing = None,
@@ -584,6 +588,8 @@ class NIDAQ(BaseEquipment):
             line='/Dev1/port0/line0:7,/Dev1/port1/line0:3').
         state : :class:`bool` or :class:`list` of :class:`bool`
             Whether to set the specified line(s) to HIGH or LOW.
+        auto_start : :class:`bool`, optional
+            Whether to automatically start the task.
         port : :class:`int`, optional
             The port number.
         timeout : :class:`float`, optional
@@ -640,7 +646,7 @@ class NIDAQ(BaseEquipment):
         self._maybe_set_timing_and_trigger(task, timing, trigger, 'digital-output')
 
         self.logger.info(f'{self.alias!r} set {lines} to {state}')
-        written = task.write(state, auto_start=True, timeout=timeout)
+        written = task.write(state, auto_start=auto_start, timeout=timeout)
         assert written == n
         if wait:
             try:
