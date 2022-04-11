@@ -948,23 +948,23 @@ class NIDAQ(BaseEquipment):
                        level=level, retriggerable=retriggerable, rising=rising)
 
     @staticmethod
-    def time_array(dt: float, n: int | np.ndarray) -> np.ndarray:
+    def time_array(n: int | np.ndarray, dt: float) -> np.ndarray:
         """Create an array based on a sampling time.
 
         Parameters
         ----------
-        dt : :class:`float`
-            The sampling time.
         n : :class:`int` or :class:`numpy.ndarray`
             The number of samples. If a :class:`numpy.ndarray` then
             the `size` attribute is used to determine the number of samples.
+        dt : :class:`float`
+            The sampling time.
 
         Returns
         -------
         :class:`numpy.ndarray`
             The array (e.g., [0, dt, 2*dt, 3*dt, ..., (n-1)*dt]).
         """
-        num = n if isinstance(n, int) else n.size
+        num = n.shape[-1] if isinstance(n, np.ndarray) else n
         return np.linspace(0., dt*num, num=num, endpoint=False, dtype=float)
 
     @staticmethod

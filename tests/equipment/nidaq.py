@@ -89,7 +89,7 @@ data, dt = daq.analog_in('0:7', duration=1, timing=daq.timing(rate=100))
 assert data.shape == (8, 100), data.shape
 assert dt == 0.01
 x = np.asarray([i*dt for i in range(100)])
-x2 = daq.time_array(dt, 100)
+x2 = daq.time_array(100, dt)
 assert np.array_equal(x, x2)
 
 
