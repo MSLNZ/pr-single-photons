@@ -905,7 +905,7 @@ class NIDAQ(BaseEquipment):
         return Timing(finite=finite, source=source, rate=rate, rising=rising)
 
     def trigger(self,
-                channel: int, *,
+                source: int | str, *,
                 delay: float = 0,
                 hysteresis: float = 0,
                 level: float = None,
@@ -915,8 +915,10 @@ class NIDAQ(BaseEquipment):
 
         Parameters
         ----------
-        channel : :class:`int`
-            Either a PFI or an AI channel number to use as the trigger source.
+        source : :class:`int` or :class:`str`
+            Either a PFI or an AI channel number or a
+            `terminal name <https://www.ni.com/documentation/en/ni-daqmx/latest/mxcncpts/termnames/>`_
+            to use as the trigger source.
         delay : :class:`float`, optional
             The time (in seconds) between the trigger event and when to
             acquire/generate samples. Can be < 0 to acquire/generate samples
@@ -940,10 +942,13 @@ class NIDAQ(BaseEquipment):
         :class:`.Trigger`
             The trigger instance.
         """
-        if level is None:
-            source = f'/{self.DEV}/PFI{channel}'
-        else:
-            source = f'/{self.DEV}/APFI{channel}'
+        if not isinstance(source, str):
+            if level is None:
+                source = f'/{self.DEV}/PFI{source}'
+            else:
+                source = f'/{self.DEV}/APFI{source}'
+        if not source.startswith(f'/{self.DEV}/'):
+            source = f'/{self.DEV}/{source}'
         return Trigger(source=source, delay=delay, hysteresis=hysteresis,
                        level=level, retriggerable=retriggerable, rising=rising)
 
