@@ -10,6 +10,10 @@ from typing import (
 import numpy as np
 import nidaqmx.constants
 from msl.qt import Signal
+from scipy.signal import (
+    sawtooth,
+    square,
+)
 
 from . import (
     BaseEquipment,
@@ -764,6 +768,81 @@ class NIDAQ(BaseEquipment):
                 timeout=timeout,
             )
             return data
+
+    def function_generator(self,
+                           channel: int | str, *,
+                           amplitude: float = 1,
+                           duty: float = 0.5,
+                           frequency: float = 1000,
+                           offset: float = 0,
+                           nsamples: int = 1000,
+                           phase: float = 0,
+                           preview: bool = False,
+                           symmetry: float = 1.0,
+                           trigger: Trigger = None,
+                           waveform: str = 'sine') -> nidaqmx.Task | np.ndarray:
+        """Generate a waveform.
+
+        Parameters
+        ----------
+        channel : :class:`int` or :class:`str`
+            The analog-output channel number(s) (e.g., channel=0, channel='0:1').
+        amplitude : :class:`float`, optional
+            The zero-to-peak amplitude of the waveform to generate in volts.
+            Zero and negative values are valid.
+        duty : :class:`float`, optional
+            The duty cycle of the square wave. Must be in the interval [0, 1].
+            Only used if `waveform` is ``square``.
+        frequency : :class:`float`, optional
+            The frequency of the waveform to generate, in hertz.
+        offset : :class:`float`, optional
+            The voltage offset of the waveform to generate.
+        nsamples : :class:`int`, optional
+            The number of voltage samples per waveform period.
+        phase : :class:`float`, optional
+            The phase of the waveform, in degrees.
+        preview : :class:`bool`, optional
+            Whether to return a :class:`~numpy.ndarray` of a single period of
+            the waveform voltages.
+        symmetry : :class:`float`, optional
+            The symmetry of the ramp. Corresponds to the ratio of the rising
+            portion of the ramp to the ramp period. For example, a symmetry of
+            0.5 corresponds to a triangle wave. Must be in the interval [0, 1].
+            Only used if `waveform` is ``ramp``.
+        trigger : :class:`.Trigger`, optional
+            The trigger settings to use. See :meth:`.trigger`.
+        waveform : :class:`str`, optional
+            Specifies the kind of waveform to generate. Can be sine, square,
+            ramp, triangle, sawtooth.
+
+        Returns
+        -------
+        :class:`~nidaqmx.Task` or :class:`~numpy.ndarray`
+            The analog-output task or a single period of the waveform if
+            `preview` is :data:`True`.
+        """
+        x0 = np.pi * phase / 180.0
+        x = np.linspace(x0, 2.0 * np.pi + x0, num=nsamples, endpoint=False)
+        match waveform.upper():
+            case 'SINE':
+                signal = np.sin(x)
+            case 'SQUARE':
+                signal = square(x, duty=duty)
+            case 'RAMP':
+                signal = sawtooth(x + np.pi/2.0, width=symmetry)
+            case 'TRIANGLE':
+                signal = sawtooth(x + np.pi/2.0, width=0.5)
+            case 'SAWTOOTH':
+                signal = sawtooth(x + np.pi, width=1.0)
+            case _:
+                raise ValueError(f'Unsupported waveform {waveform!r}')
+
+        voltages = amplitude * signal + offset
+        if preview:
+            return voltages
+
+        timing = self.timing(finite=False, rate=nsamples * frequency, rising=False)
+        return self.analog_out(channel, voltages, timing=timing, trigger=trigger, wait=False)
 
     def pulse(self,
               pfi: int,

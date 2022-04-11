@@ -156,6 +156,7 @@ install_requires = [
     'pythonnet @ git+https://github.com/pythonnet/pythonnet.git@eec30c062f93c8555bcff9ec3bb14ccc832f36df',
     'pyvisa-py',
     'requests',
+    'scipy',
 ]
 
 tests_require = ['pytest', 'pytest-cov']

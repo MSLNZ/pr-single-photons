@@ -10,6 +10,7 @@ from time import (
 import numpy as np
 import pytest
 from nidaqmx.errors import DaqError
+from scipy.optimize import curve_fit
 
 import connect
 
@@ -319,5 +320,41 @@ with pytest.raises(DaqError, match=message):
 with pytest.raises(DaqError, match=message):
     daq.edge_separation(0, 1, start_edge='rising', stop_edge=daq.Edge.RISING, timeout=1)
 
+
+#
+# Function generator
+#
+amp, freq, phase, offset = [0.4, 982.2, 61.2, 0.1]
+
+# initialize the first output voltage
+y0 = amp * np.sin(np.pi * phase / 180.) + offset
+daq.analog_out(0, y0)
+
+# trigger the function generator when the analog_out_read task starts
+daq.function_generator(0, trigger=daq.trigger('ai/StartTrigger'),
+                       amplitude=amp, frequency=freq, offset=offset, phase=phase)
+
+# make the function generator wait a bit
+sleep(0.1)
+
+out = daq.analog_out_read(0, nsamples=1000, timing=daq.timing(rate=1e5))
+times = daq.time_array(*out)
+
+
+def sin(t, *args):
+    a, f, p, o = args
+    return a * np.sin(2.0 * np.pi * f * t + p) + o
+
+
+params, covariance = curve_fit(sin, times, out[0], p0=[1, 1e3, 0, 0])
+assert params[0] == pytest.approx(amp, rel=0.001)
+assert params[1] == pytest.approx(freq, rel=0.005)
+assert params[2] == pytest.approx(phase * np.pi / 180., rel=0.02)
+assert params[3] == pytest.approx(offset, rel=0.05)
+
+assert y0 == pytest.approx(out[0][0], abs=0.0006)
+
+daq.close_all_tasks()
+daq.analog_out('0:1', [0.0, 0.0])
 
 app.disconnect_equipment()
