@@ -84,11 +84,11 @@ class LineEdit(qt.QtWidgets.QLineEdit):
         self.setFont(font)
 
     def setText(self, text: str) -> None:
-        """Override :meth:`~QWidget.QLineEdit.setText` to change the font size."""
+        """Override :meth:`~QtWidgets.QLineEdit.setText` to change the font size."""
         super().setText(text)
         self._resize_font_newton()
 
     def resizeEvent(self, event: qt.QtGui.QResizeEvent) -> None:
-        """Override :meth:`~QWidget.resizeEvent` to change the font size."""
+        """Override :meth:`~QtWidgets.QWidget.resizeEvent` to change the font size."""
         super().resizeEvent(event)
         self._resize_font_newton()
