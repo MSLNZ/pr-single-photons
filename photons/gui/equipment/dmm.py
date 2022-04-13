@@ -8,6 +8,7 @@ from . import (
     BaseWidget,
     widget,
 )
+from .. import LineEdit
 
 
 class FetchWorker(qt.Worker):
@@ -43,16 +44,10 @@ class DMM(BaseWidget):
         self.info = {}  # gets updated in update_tooltip()
         self.unit_map = {'CURRENT': 'A', 'VOLTAGE': 'V', 'DCI': 'A', 'DCV': 'V'}
 
-        self.value_lineedit = qt.QtWidgets.QLineEdit()
-        self.value_lineedit.setReadOnly(True)
-        self.value_lineedit.setSizePolicy(qt.QtWidgets.QSizePolicy.Expanding, qt.QtWidgets.QSizePolicy.Expanding)
-        self.value_lineedit.setAlignment(qt.Qt.AlignRight)
+        self.value_lineedit = LineEdit()
         self.update_tooltip()
 
-        self.uncertainty_lineedit = qt.QtWidgets.QLineEdit()
-        self.uncertainty_lineedit.setReadOnly(True)
-        self.uncertainty_lineedit.setSizePolicy(qt.QtWidgets.QSizePolicy.Expanding, qt.QtWidgets.QSizePolicy.Expanding)
-        self.uncertainty_lineedit.setAlignment(qt.Qt.AlignRight)
+        self.uncertainty_lineedit = LineEdit()
         self.uncertainty_lineedit.setToolTip('The standard deviation')
 
         self.config_button = qt.Button(
@@ -60,12 +55,6 @@ class DMM(BaseWidget):
             left_click=self.on_edit_configuration,
             tooltip='Edit the configuration'
         )
-
-        self.font = qt.QtGui.QFont(self.value_lineedit.font())
-        self.font_size_spinbox = qt.SpinBox()
-        self.font_size_spinbox.setRange(0, 999)
-        self.font_size_spinbox.setToolTip('The font size to use to display the value')
-        self.font_size_spinbox.valueChanged.connect(self.on_font_size_changed)
 
         self.live_spinbox = qt.SpinBox()
         self.live_spinbox.setRange(0, 99999)
@@ -82,7 +71,6 @@ class DMM(BaseWidget):
         hbox.addWidget(self.config_button)
         hbox.addSpacerItem(qt.QtWidgets.QSpacerItem(
             1, 1, qt.QtWidgets.QSizePolicy.Expanding, qt.QtWidgets.QSizePolicy.Minimum))
-        # hbox.addWidget(self.font_size_spinbox)
         hbox.addWidget(self.live_spinbox)
         hbox.addWidget(self.live_checkbox)
 
@@ -108,11 +96,6 @@ class DMM(BaseWidget):
             self.update_lineedits(*args)
         else:
             self.update_tooltip(kwargs)
-
-    def resizeEvent(self, event):
-        """Override :class:`QWidget.resizeEvent` to also change the font size."""
-        super(DMM, self).resizeEvent(event)
-        self.font_size_spinbox.setValue(event.size().width() // 10)
 
     def closeEvent(self, event):
         """Override :meth:`QWidget.closeEvent` to also stop the Thread and the Timer."""
@@ -157,12 +140,6 @@ class DMM(BaseWidget):
     def on_config_changed(self):
         """Slot for the connection.config_changed signal."""
         self.update_tooltip()
-
-    def on_font_size_changed(self, size):
-        """Slot for the font_size_spinbox.valueChanged signal."""
-        self.font.setPointSize(size)
-        self.value_lineedit.setFont(self.font)
-        self.uncertainty_lineedit.setFont(self.font)
 
     def on_live_checkbox_changed(self, checked):
         """Slot for the live_checkbox.clicked signal."""

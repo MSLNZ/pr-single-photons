@@ -16,6 +16,7 @@ from msl.qt.utils import (
 )
 from msl.io import read
 
+from .line_edit import LineEdit
 from .. import logger
 from .equipment import (
     widgets,
