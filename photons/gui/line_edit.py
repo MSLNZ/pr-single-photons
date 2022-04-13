@@ -1,7 +1,5 @@
 from msl import qt
 
-from .. import logger
-
 
 class LineEdit(qt.QtWidgets.QLineEdit):
 
@@ -61,7 +59,6 @@ class LineEdit(qt.QtWidgets.QLineEdit):
         fm = qt.QtGui.QFontMetrics
 
         def f(x):
-            logger.info(f'x={x}')
             font.setPointSizeF(x)
             br = fm(font).boundingRect(text)
             return float(min(width - br.width(), height - br.height()))
@@ -85,7 +82,6 @@ class LineEdit(qt.QtWidgets.QLineEdit):
                 break
         font.setPointSizeF(current - 1.0)  # under fill the widget
         self.setFont(font)
-        logger.info(f'{current - 1.0}, {self.font().pointSizeF()}')
 
     def setText(self, text: str) -> None:
         """Override :meth:`~QWidget.QLineEdit.setText` to change the font size."""
