@@ -352,7 +352,7 @@ assert params[1] == pytest.approx(freq, rel=0.005)
 assert params[2] == pytest.approx(phase * np.pi / 180., rel=0.02)
 assert params[3] == pytest.approx(offset, rel=0.05)
 
-assert y0 == pytest.approx(out[0][0], abs=0.0006)
+assert y0 == pytest.approx(out[0][0], abs=0.001)
 
 daq.close_all_tasks()
 daq.analog_out('0:1', [0.0, 0.0])
