@@ -134,7 +134,12 @@ class HP34401A(DMM):
     def bus_trigger(self) -> None:
         """Send a software trigger."""
         self.logger.info(f'software trigger {self.alias!r}')
-        self._send_command_with_opc('INIT;*TRG')
+        self.connection.write('INIT;*TRG;*OPC?')
+
+    def fetch(self, initiate: bool = False) -> tuple:
+        if not initiate:
+            assert self.connection.read().startswith('1'), '*OPC? from bus_trigger did not return 1'
+        return super().fetch(initiate=initiate)
 
     def configure(self, *, function='voltage', range=10, nsamples=10, nplc=10, auto_zero=True,
                   trigger='bus', edge='falling', ntriggers=1, delay=None) -> dict:
