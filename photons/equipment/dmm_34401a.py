@@ -60,6 +60,7 @@ class HP34401A(DMM):
         """
         super(HP34401A, self).__init__(app, record, demo=demo)
         self.remote_mode()
+        self.disconnect = self._disconnect
 
     def check_errors(self) -> None:
         """Query the multimeter’s error queue.
@@ -71,19 +72,19 @@ class HP34401A(DMM):
             self.connection.raise_exception(message)
 
     def remote_mode(self) -> None:
-        """Place the multimeter in remote mode for RS-232 operation.
+        """Set the multimeter to be in REMOTE mode.
 
         All keys on the front panel, except the LOCAL key, are disabled.
         """
-        self.logger.info(f'put {self.alias!r} in REMOTE mode')
+        self.logger.info(f'set {self.alias!r} to REMOTE mode')
         self._send_command_with_opc('SYSTEM:REMOTE')
 
     def local_mode(self) -> None:
-        """Place the multimeter in local mode.
+        """Set the multimeter to be in LOCAL mode.
 
         All keys on the front panel are fully functional.
         """
-        self.logger.info(f'put {self.alias!r} in LOCAL mode')
+        self.logger.info(f'set {self.alias!r} to LOCAL mode')
         self._send_command_with_opc('SYSTEM:LOCAL')
 
     def info(self) -> dict:
@@ -198,3 +199,8 @@ class HP34401A(DMM):
         self.config_changed.emit(info)
         self.emit_notification(**info)
         return info
+
+    def _disconnect(self) -> None:
+        """Set the digital multimeter to be in LOCAL mode and then close the connection."""
+        self.local_mode()
+        self.connection.disconnect()
