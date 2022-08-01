@@ -3,6 +3,8 @@ Communicate with a Hewlett Packard 34401A digital multimeter.
 """
 import re
 
+from msl.equipment.connection_serial import ConnectionSerial
+
 from . import equipment
 from .dmm import DMM
 
@@ -59,7 +61,9 @@ class HP34401A(DMM):
             a connection in demo mode.
         """
         super(HP34401A, self).__init__(app, record, demo=demo)
-        self.remote_mode()
+        self._rs232 = isinstance(self.connection, ConnectionSerial)
+        if self._rs232:
+            self.remote_mode()
         self.disconnect = self._disconnect
 
     def check_errors(self) -> None:
@@ -72,18 +76,28 @@ class HP34401A(DMM):
             self.connection.raise_exception(message)
 
     def remote_mode(self) -> None:
-        """Set the multimeter to be in REMOTE mode.
+        """Set the multimeter to be in REMOTE mode for the RS-232 interface.
 
         All keys on the front panel, except the LOCAL key, are disabled.
         """
+        if not self._rs232:
+            self.logger.warning(f'setting {self.alias!r} to REMOTE mode is '
+                                f'only valid for the RS-232 interface')
+            return
+
         self.logger.info(f'set {self.alias!r} to REMOTE mode')
         self._send_command_with_opc('SYSTEM:REMOTE')
 
     def local_mode(self) -> None:
-        """Set the multimeter to be in LOCAL mode.
+        """Set the multimeter to be in LOCAL mode for the RS-232 interface.
 
         All keys on the front panel are fully functional.
         """
+        if not self._rs232:
+            self.logger.warning(f'setting {self.alias!r} to LOCAL mode is '
+                                f'only valid for the RS-232 interface')
+            return
+
         self.logger.info(f'set {self.alias!r} to LOCAL mode')
         self._send_command_with_opc('SYSTEM:LOCAL')
 
@@ -135,11 +149,16 @@ class HP34401A(DMM):
     def bus_trigger(self) -> None:
         """Send a software trigger."""
         self.logger.info(f'software trigger {self.alias!r}')
-        self.connection.write('INIT;*TRG;*OPC?')
+        if self._rs232:
+            self.connection.write('INIT;*TRG;*OPC?')
+        else:
+            self.connection.write('INIT;*TRG;*OPC')
 
     def fetch(self, initiate: bool = False) -> tuple:
         if not initiate:
-            assert self.connection.read().startswith('1'), '*OPC? from bus_trigger did not return 1'
+            if self._rs232:
+                if not self.connection.read().startswith('1'):
+                    self.connection.raise_exception('*OPC? from bus_trigger did not return 1')
         return super().fetch(initiate=initiate)
 
     def configure(self, *, function='voltage', range=10, nsamples=10, nplc=10, auto_zero=True,
@@ -202,5 +221,6 @@ class HP34401A(DMM):
 
     def _disconnect(self) -> None:
         """Set the digital multimeter to be in LOCAL mode and then close the connection."""
-        self.local_mode()
+        if self._rs232:
+            self.local_mode()
         self.connection.disconnect()
