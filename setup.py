@@ -190,7 +190,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Topic :: Software Development',
         'Topic :: Scientific/Engineering',
