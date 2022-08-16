@@ -54,7 +54,8 @@ logger.setLevel(env_level())
 
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)-5s] %(name)s - %(message)s',
+    format='%(asctime)s.%(msecs)03d [%(levelname)-5s] %(name)s - %(message)s',
+    datefmt='%Y-%m-%dT%H:%M:%S',
 )
 
 set_errors('asyncio', 'urllib3')
