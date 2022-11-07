@@ -1,1 +1,1 @@
-Photon-counting software used by the Photometry and Radiometry team.
+Software used by the Photometry and Radiometry team in the single-photon lab.

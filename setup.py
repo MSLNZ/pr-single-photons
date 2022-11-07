@@ -179,7 +179,7 @@ setup(
     author=fetch_init('__author__'),
     author_email='joseph.borbely@measurement.govt.nz',
     url='https://github.com/MSLNZ/pr-single-photons',
-    description='Photon-counting software used by the Photometry and Radiometry team',
+    description='Single-photon software used by the Photometry and Radiometry team',
     long_description=read('README.rst'),
     platforms='Windows',
     license='MIT',
