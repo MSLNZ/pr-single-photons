@@ -200,8 +200,15 @@ setup(
     setup_requires=sphinx + pytest_runner,
     tests_require=tests_require,
     install_requires=install_requires,
-    extras_require={'tests': tests_require, 'docs': docs_require, 'dev': tests_require+docs_require},
-    cmdclass={'docs': BuildDocs, 'apidocs': ApiDocs},
+    extras_require={
+        'tests': tests_require,
+        'docs': docs_require,
+        'dev': tests_require + docs_require,
+    },
+    cmdclass={
+        'docs': BuildDocs,
+        'apidocs': ApiDocs,
+    },
     entry_points={
         'console_scripts': [
             'photons = photons:create_app_and_gui',
