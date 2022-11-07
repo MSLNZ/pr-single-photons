@@ -60,7 +60,7 @@ class BuildDocs(Command):
     def run(self):
         command = [
             None,  # in Sphinx < 1.7.0 the first command-line argument was parsed, in 1.7.0 it became argv[1:]
-            '-b', 'html',  # the builder to use, e.g., create a HTML version of the documentation
+            '-b', 'html',  # the builder to use, e.g., create an HTML version of the documentation
             '-a',  # generate output for all files
             '-E',  # ignore cached files, forces to re-read all source files from disk
             'docs',  # the source directory where the documentation files are located
