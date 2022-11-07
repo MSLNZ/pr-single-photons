@@ -3,7 +3,7 @@
 pr-single-photons
 =================
 
-Write the documentation for **pr-single-photons**.
+Software for single-photon generation and detection.
 
 Contents
 ========
@@ -11,6 +11,7 @@ Contents
 .. toctree::
    :maxdepth: 2
 
+   API <_api/modules>
    License <license>
    Authors <authors>
    Release Notes <changelog>
