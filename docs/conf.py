@@ -43,6 +43,7 @@ else:
         'member-order': 'bysource',
         'undoc-members': None,
         'show-inheritance': None,
+        'exclude-members': 'staticMetaObject',
     }
 
 # Generate autodoc stubs with summaries from code
