@@ -27,6 +27,7 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.napoleon',
     'sphinx.ext.todo',
+    'sphinx_autodoc_typehints',
 ]
 
 # autodoc options
