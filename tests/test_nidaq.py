@@ -1,4 +1,7 @@
+import os
+
 import numpy as np
+import pytest
 
 from photons.equipment.nidaq import NIDAQ
 from photons.equipment.nidaq import Timing
@@ -54,6 +57,7 @@ def test_time_array():
     assert x.shape == (1000,)
 
 
+@pytest.mark.skipif(os.environ.get('GITHUB_ACTIONS') == 'true', reason='requires nidaqmx DLLs')
 def test_wait_until_done():
     task = NIDAQ.Task()
     NIDAQ.wait_until_done(task)
