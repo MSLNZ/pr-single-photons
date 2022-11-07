@@ -146,6 +146,9 @@ def get_version():
 
 
 install_requires = [
+    'google-api-python-client',
+    'google-auth-httplib2',
+    'google-auth-oauthlib',
     'msl-equipment @ git+https://github.com/MSLNZ/msl-equipment.git',
     'msl-network',
     'msl-package-manager',
