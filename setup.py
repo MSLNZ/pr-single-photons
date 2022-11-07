@@ -155,7 +155,7 @@ install_requires = [
     'nidaqmx',
     'numpy',
     'pyqtgraph',
-    'pythonnet @ git+https://github.com/pythonnet/pythonnet.git@93631aff83b34a0665374cd41313c8552b88b545',
+    'pythonnet',
     'pyvisa-py',
     'requests',
     'scipy',
