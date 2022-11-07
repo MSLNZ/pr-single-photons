@@ -1,4 +1,6 @@
+import os
 import subprocess
+import tempfile
 
 
 def run(*args: str) -> tuple[int, bytes]:
@@ -32,6 +34,12 @@ def test_invalid_name():
 
 
 def test_invalid_alias():
-    code, stdout = run('--alias', 'a', '--kwargs', '{"host": "localhost", "port": 2000}')
+    file = os.path.join(tempfile.gettempdir(), 'pr-single-photons-dummy.xml')
+    with open(file, mode='wt') as f:
+        f.write('<?xml version="1.0" encoding="UTF-8" ?>\n<photons/>')
+
+    code, stdout = run('--alias', 'a', file)
     assert code == 1
     assert stdout.endswith(b"No EquipmentRecord exists with the alias 'a'")
+
+    os.remove(file)
