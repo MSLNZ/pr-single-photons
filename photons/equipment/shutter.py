@@ -1,56 +1,61 @@
 """
 Base class for a shutter.
 """
+from msl.equipment import EquipmentRecord
+from msl.qt import QtCore
 from msl.qt import Signal
 
-from . import BaseEquipment
+from .base import BaseEquipment
 
 
 class Shutter(BaseEquipment):
 
-    state_changed = Signal(bool)  # True: shutter is open, False: shutter is closed
+    # True: shutter is open, False: shutter is closed
+    state_changed: QtCore.SignalInstance = Signal(bool)
 
-    def __init__(self, app, record, *, demo=None):
+    def __init__(self, record: EquipmentRecord, **kwargs) -> None:
         """Base class for a shutter.
 
-        Parameters
-        ----------
-        app : :class:`photons.App`
-            The main application entry point.
-        record : :class:`~msl.equipment.record_types.EquipmentRecord`
-            The equipment record.
-        demo : :class:`bool`, optional
-            Whether to simulate a connection to the equipment by opening
-            a connection in demo mode.
+        Args:
+            record: The equipment record.
+            **kwargs: Keyword arguments. Can be specified as attributes
+                of an XML element in a configuration file (with the tag
+                of the element equal to the alias of `record`).
         """
-        super(Shutter, self).__init__(app, record, demo=demo)
+        super().__init__(record, **kwargs)
 
         # suppress the warning that the following attributes cannot be made
         # available when starting the BaseEquipment as a Service
-        self.ignore_attributes(['state_changed'])
+        self.ignore_attributes('state_changed')
 
         # the shutter that is attached to the controller
         # use the following format in ConnectionRecord.properties shutter=model[serial]
         self.shutter_name = record.connection.properties.get('shutter')
+        if self.shutter_name is None:
+            self.raise_exception(
+                'Cannot determine the name of the shutter.\n'
+                'Define a shutter=model[serial] parameter '
+                'in the properties of the ConnectionRecord'
+            )
 
-    def close(self) -> None:
-        """Close the shutter."""
+    def is_open(self) -> bool:
+        """Query whether the shutter is open (True) or closed (False)."""
         raise NotImplementedError
 
     def open(self) -> None:
         """Open the shutter."""
         raise NotImplementedError
 
-    def is_open(self) -> bool:
-        """Query whether the shutter is open or closed."""
+    def close(self) -> None:
+        """Close the shutter."""
         raise NotImplementedError
 
     def _log_and_emit_opened(self):
         self.logger.info(f'open the shutter {self.shutter_name!r}')
         self.state_changed.emit(True)
-        self.emit_notification(True)  # to all linked clients
+        self.maybe_emit_notification(True)
 
     def _log_and_emit_closed(self):
         self.logger.info(f'close the shutter {self.shutter_name!r}')
         self.state_changed.emit(False)
-        self.emit_notification(False)  # to all linked clients
+        self.maybe_emit_notification(False)

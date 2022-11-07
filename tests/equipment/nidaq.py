@@ -2,10 +2,8 @@
 Test that photons/equipment/nidaq.py is working properly.
 """
 import math
-from time import (
-    perf_counter,
-    sleep,
-)
+from time import perf_counter
+from time import sleep
 
 import numpy as np
 import pytest

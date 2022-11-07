@@ -3,36 +3,37 @@ Helper module to test equipment.
 """
 import sys
 
-from msl.qt import prompt
-
 from photons import App
+from photons.app import ConnectionClass
 
 
-def device(alias, message):
+def device(aliases: str | tuple[str, ...], message: str) -> tuple[App, ConnectionClass]:
     """Connect to a device.
 
-    Parameters
-    ----------
-    alias : :class:`str`
-        The alias of the device to connect to.
-    message : :class:`str`
-        A message to display in a prompt asking whether it is safe to proceed.
+    Args:
+        aliases: The alias(es) of the device to connect to.
+        message: A message to display in a prompt asking whether it is safe to proceed.
 
-    Returns
-    -------
-    :class:`tuple`
+    Returns:
         The application instance and the connection class to the device.
     """
-    app = App(r'D:\config.xml')
+    if isinstance(aliases, str):
+        aliases = (aliases,)
 
+    app = App()
     try:
-        dev = app.connect_equipment(alias)
+        devs = app.connect_equipment(*aliases)
     except Exception as e:
-        prompt.critical(str(e))
+        app.prompt.critical(e)
         sys.exit()
 
-    if not prompt.yes_no(f'{message}\n\n{dev.record!r}'):
+    if len(aliases) == 1:
+        info = f'{devs.record}'
+    else:
+        info = '\n'.join(dev.record for dev in devs)
+
+    if not app.prompt.yes_no(f'{message}\n\n{info}'):
         app.disconnect_equipment()
         sys.exit()
 
-    return app, dev
+    return app, devs

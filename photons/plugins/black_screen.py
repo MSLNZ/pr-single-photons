@@ -1,24 +1,30 @@
 """
 Plugin that is just a widget with a black background.
 """
-from . import (
-    plugin,
-    BasePlugin,
-)
+from __future__ import annotations
+
+import typing
+
+from msl.qt import QtGui
+
+from .base import BasePlugin
+from .base import plugin
+
+if typing.TYPE_CHECKING:
+    from ..app import MainWindow
 
 
 @plugin(name='Black Screen', description='Make the desktop screen black')
 class BlackScreen(BasePlugin):
 
-    def __init__(self, parent):
+    def __init__(self, parent: MainWindow, **kwargs) -> None:
         """Make the desktop screen black.
 
-        Parameters
-        ----------
-        parent : :class:`QtWidgets.QWidget`
-            The parent widget.
+        Args:
+            parent: The main window.
+            **kwargs: All keyword arguments are passed to super().
         """
-        super(BlackScreen, self).__init__(parent)
+        super().__init__(parent, **kwargs)
         self.setWindowTitle('Click anywhere or press any key to enable full screen')
         self.setStyleSheet('background-color:black')
         self.showNormal()
@@ -30,12 +36,12 @@ class BlackScreen(BasePlugin):
         else:
             self.showFullScreen()
 
-    def mousePressEvent(self, event) -> None:
-        """Overrides :meth:`QtWidgets.QtWidget.mousePressEvent`."""
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Overrides :meth:`QtWidgets.QWidget.mousePressEvent`."""
         self.toggle()
-        super(BlackScreen, self).mousePressEvent(event)
+        super().mousePressEvent(event)
 
-    def keyPressEvent(self, event) -> None:
-        """Overrides :meth:`QtWidgets.QtWidget.keyPressEvent`."""
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        """Overrides :meth:`QtWidgets.QWidget.keyPressEvent`."""
         self.toggle()
-        super(BlackScreen, self).keyPressEvent(event)
+        super().keyPressEvent(event)

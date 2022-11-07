@@ -1,50 +1,47 @@
 """
-Communicate with an OptoSigma SHOT-702 controller.
+OptoSigma SHOT-702 controller.
 """
-from time import (
-    sleep,
-    time,
-)
+import re
+import time
 from threading import Thread
-from typing import Tuple
 
+from msl.equipment import EquipmentRecord
+from msl.equipment.exceptions import OptoSigmaError
+from msl.equipment.resources.optosigma import SHOT702
+from msl.qt import QtCore
 from msl.qt import Signal
 
-from . import (
-    BaseEquipment,
-    equipment,
-)
+from .base import BaseEquipment
+from .base import equipment
 
 
-@equipment(manufacturer=r'OptoSigma', model=r'SHOT-702')
+@equipment(manufacturer=r'OptoSigma', model=r'SHOT-702', flags=re.ASCII)
 class OptoSigmaSHOT702(BaseEquipment):
+
+    connection: SHOT702
 
     NUM_PULSES_PER_360_DEGREES = 144000
 
-    angle_changed = Signal()
+    angle_changed: QtCore.SignalInstance = Signal()
 
-    def __init__(self, app, record, *, demo=None):
-        """Communicate with an OptoSigma SHOT-702 controller.
+    def __init__(self, record: EquipmentRecord, **kwargs) -> None:
+        """OptoSigma SHOT-702 controller.
 
-        Parameters
-        ----------
-        app : :class:`photons.App`
-            The main application entry point.
-        record : :class:`~msl.equipment.record_types.EquipmentRecord`
-            The equipment record.
-        demo : :class:`bool`, optional
-            Whether to simulate a connection to the equipment by opening
-            a connection in demo mode.
+        Args:
+            record: The equipment record.
+            **kwargs: Keyword arguments. Can be specified as attributes
+                of an XML element in a configuration file (with the tag
+                of the element equal to the alias of `record`).
         """
-        super(OptoSigmaSHOT702, self).__init__(app, record, demo=demo)
+        super().__init__(record, **kwargs)
 
-        self._emitting_thread = None
-        self._stop_slowly_requested = False
-        self._degrees_per_pulse = 360.0 / float(self.NUM_PULSES_PER_360_DEGREES)
+        self._emitting_thread: Thread | None = None
+        self._stop_slowly_requested: bool = False
+        self._degrees_per_pulse: float = 360.0 / float(self.NUM_PULSES_PER_360_DEGREES)
 
         # suppress the warning that the following attributes cannot be made
         # available when starting the BaseEquipment as a Service
-        self.ignore_attributes(['angle_changed'])
+        self.ignore_attributes('angle_changed')
 
         # find out what is attached to each stage -> stage#=model[serial] where # is either 1 or 2
         stage1 = record.connection.properties.get('stage1')
@@ -56,116 +53,91 @@ class OptoSigmaSHOT702(BaseEquipment):
         elif stage2 and stage2 == 'OSMS-60-NDU_FCBH-069[10634]':
             self._wheel = 2
         else:
-            self.connection.raise_exception(
+            self.raise_exception(
                 f'\nCannot determine which stage the continuously-variable '
                 f'filter wheel is attached to. Define a stage#=model[serial] '
                 f'in the record.connection.properties, where # is 1 or 2'
             )
 
-        self.stop_slowly()
+        # Sometimes the controller sends data in an unexpected format.
+        # The try-except block is an attempt to clear the controller's buffer.
+        # Using PySerial's read_all() method clears the buffer for the OS, not the controller.
+        try:
+            self.stop_slowly()
+        except OptoSigmaError:
+            self.stop_slowly()
 
     @property
     def degrees_per_pulse(self) -> float:
-        """:class:`float`: Returns the number of degrees per pulse."""
+        """Returns the number of degrees per pulse."""
         return self._degrees_per_pulse
 
     def degrees_to_position(self, degrees: float) -> int:
         """Convert an angle, in degrees, to an encoder position.
 
-        Parameters
-        ----------
-        degrees : :class:`float`
-            An angle, in degrees.
+        Args:
+            degrees: An angle, in degrees.
 
-        Returns
-        -------
-        :class:`int`
+        Returns:
             The corresponding encoder position.
         """
         return round(degrees / self._degrees_per_pulse)
 
     def get_angle(self) -> float:
-        """Get the angle of the filter wheel.
-
-        Returns
-        -------
-        :class:`float`
-            The angle, in degrees.
-        """
+        """Returns the angle (in degrees) of the filter wheel."""
         position, _ = self.status()
         return self.position_to_degrees(position)
 
-    def get_speed(self) -> Tuple[int, int, int]:
+    def get_speed(self) -> tuple[int, int, int]:
         """Get speed that the stage moves to a new angle.
 
-        Returns
-        -------
-        :class:`int`
-            The minimum speed (in number of pulses per second)
-        :class:`int`
-            The maximum speed (in number of pulses per second)
-        :class:`int`
-            The acceleration/deceleration time in ms.
+        Returns:
+            The minimum speed (in number of pulses per second),
+                the maximum speed (in number of pulses per second)
+                and the acceleration/deceleration time in ms.
         """
         return self.connection.get_speed()[f'stage{self._wheel}']
 
-    def get_speed_home(self) -> Tuple[int, int, int]:
+    def get_speed_home(self) -> tuple[int, int, int]:
         """Get speed that the stage moves home.
 
-        Returns
-        -------
-        :class:`int`
-            The minimum speed (in number of pulses per second)
-        :class:`int`
-            The maximum speed (in number of pulses per second)
-        :class:`int`
-            The acceleration/deceleration time in ms.
+        Returns:
+            The minimum speed (in number of pulses per second),
+                the maximum speed (in number of pulses per second),
+                and the acceleration/deceleration time in ms.
         """
         return self.connection.get_speed_origin()[f'stage{self._wheel}']
 
-    def home(self, *,
-             timeout: float = 30,
-             wait: bool = True) -> None:
+    def home(self,
+             *,
+             wait: bool = True,
+             timeout: float = 30) -> None:
         """Home the continuously-variable filter wheel.
 
-        Parameters
-        ----------
-        timeout : :class:`float`, optional
-            The maximum number of seconds to wait for the wheel to stop moving.
-        wait : :class:`bool`, optional
-            Whether to wait for the wheel to stop moving.
+        Args:
+            wait: Whether to wait for the wheel to stop moving.
+            timeout: The maximum number of seconds to wait for the wheel to
+                stop moving.
         """
         self.connection.home(self._wheel)
         self.logger.info(f'home {self.alias!r}')
         self.angle_changed.emit()
-        if self.connected_as_link:
-            self._start_emitting()
+        self._maybe_start_emitting()
         if wait:
             self._wait(timeout)
 
     def is_moving(self) -> bool:
-        """Returns whether the filter wheel is moving.
-
-        Returns
-        -------
-        :class:`bool`
-            Whether the filter wheel is moving.
-        """
+        """Returns whether the filter wheel is moving."""
         return self.status()[1]
 
     def position_to_degrees(self, position: int, *, bound: bool = False) -> float:
         """Convert an encoder position to an angle in degrees.
 
-        Parameters
-        ----------
-        position : :class:`int`
-            The encoder position.
-        bound : :class:`bool`, optional
-            Whether to bound the angle to be between [0, 360) degrees.
+        Args:
+            position: The encoder position.
+            bound: Whether to bound the angle to be between [0, 360) degrees.
 
-        Returns
-        -------
-        :class:`float`
+        Returns:
             The angle in degrees.
         """
         degrees = round(position * self._degrees_per_pulse, 4)
@@ -174,81 +146,68 @@ class OptoSigmaSHOT702(BaseEquipment):
         return degrees
 
     def set_angle(self,
-                  degrees: float, *,
-                  timeout: float = 30,
-                  wait: bool = True) -> None:
+                  degrees: float,
+                  *,
+                  wait: bool = True,
+                  timeout: float = 30) -> None:
         """Set the angle of the continuously-variable filter wheel.
 
-        Parameters
-        ----------
-        degrees : :class:`float`
-            The angle.
-        timeout : :class:`float`, optional
-            The maximum number of seconds to wait for the wheel to stop moving.
-        wait : :class:`bool`, optional
-            Whether to wait for the wheel to stop moving.
+        Args:
+            degrees: The angle, in degrees.
+            wait: Whether to wait for the wheel to stop moving.
+            timeout: The maximum number of seconds to wait for the wheel to
+                stop moving.
         """
         self.connection.move_absolute(self._wheel, self.degrees_to_position(degrees))
         self.logger.info(f'{self.alias!r} set to {degrees} degrees')
         self.angle_changed.emit()
-        if self.connected_as_link:
-            self._start_emitting()
+        self._maybe_start_emitting()
         if wait:
             self._wait(timeout)
 
-    def set_speed(self, minimum, maximum, acceleration) -> None:
+    def set_speed(self, minimum: int, maximum: int, acceleration: int) -> None:
         """Set speed that the stage moves to a new angle.
 
-        According to the manual:
-        Max. Driving Speed: 500000 pps -> 1250 deg/s
-        Min. Driving Speed: 1 pps -> 0.0025 deg/s
-        Acceleration/Deceleration Time: 1 - 1000ms
+        According to the manual::
 
-        Parameters
-        ----------
-        :class:`int`
-            The minimum speed (in number of pulses per second)
-        :class:`int`
-            The maximum speed (in number of pulses per second)
-        :class:`int`
-            The acceleration/deceleration time in ms.
+            Max. Driving Speed: 500000 pps -> 1250 deg/s
+            Min. Driving Speed: 1 pps -> 0.0025 deg/s
+            Acceleration/Deceleration Time: 1 - 1000ms
+
+        Args:
+            minimum: The minimum speed (in number of pulses per second).
+            maximum: The maximum speed (in number of pulses per second).
+            acceleration: The acceleration/deceleration time in ms.
         """
         self.connection.set_speed(self._wheel, minimum, maximum, acceleration)
         self.logger.info(f'{self.alias!r} set the move speed settings to '
                          f'minimum={minimum} PPS, maximum={maximum} PPS, '
                          f'acceleration={acceleration} ms')
 
-    def set_speed_home(self, minimum, maximum, acceleration) -> None:
+    def set_speed_home(self, minimum: int, maximum: int, acceleration: int) -> None:
         """Set speed that the stage moves home.
 
-        According to the manual:
-        Max. Driving Speed: 500000 pps -> 1250 deg/s
-        Min. Driving Speed: 1 pps -> 0.0025 deg/s
-        Acceleration/Deceleration Time: 1 - 1000ms
+        According to the manual::
 
-        Parameters
-        ----------
-        :class:`int`
-            The minimum speed (in number of pulses per second)
-        :class:`int`
-            The maximum speed (in number of pulses per second)
-        :class:`int`
-            The acceleration/deceleration time in ms.
+            Max. Driving Speed: 500000 pps -> 1250 deg/s
+            Min. Driving Speed: 1 pps -> 0.0025 deg/s
+            Acceleration/Deceleration Time: 1 - 1000ms
+
+        Args:
+            minimum: The minimum speed (in number of pulses per second).
+            maximum: The maximum speed (in number of pulses per second).
+            acceleration: The acceleration/deceleration time in ms.
         """
         self.connection.set_speed_origin(self._wheel, minimum, maximum, acceleration)
         self.logger.info(f'{self.alias!r} set the move home speed settings to '
                          f'minimum={minimum} PPS, maximum={maximum} PPS, '
                          f'acceleration={acceleration} ms')
 
-    def status(self) -> Tuple[int, bool]:
+    def status(self) -> tuple[int, bool]:
         """Get the status of the continuously-variable filter wheel.
 
-        Returns
-        -------
-        :class:`int`
-            The position of the encoder.
-        :class:`bool`
-            Whether the stage is moving.
+        Returns:
+            The position of the encoder and whether the stage is moving.
         """
         p1, p2, state, is_moving = self.connection.status()
         position = p1 if self._wheel == 1 else p2
@@ -259,34 +218,37 @@ class OptoSigmaSHOT702(BaseEquipment):
         if self._emitting_thread is not None:
             self._stop_slowly_requested = True
             self._emitting_thread.join()
+            self._emitting_thread = None
+            self._stop_slowly_requested = False
         self.connection.stop_slowly(self._wheel)
         self.logger.info(f'stopping {self.alias!r} slowly')
 
-    def _start_emitting(self) -> None:
-        """Emit notifications in a separate :class:`~threading.Thread`."""
-        self._emitting_thread = Thread(target=self._emit_notification, daemon=True)
-        self._emitting_thread.start()
+    def _maybe_start_emitting(self) -> None:
+        """Emit notifications in a separate Thread."""
+        if self.notifications_allowed:
+            self._emitting_thread = Thread(target=self._notify_clients, daemon=True)
+            self._emitting_thread.start()
 
-    def _emit_notification(self) -> None:
-        """Emit a notification to all linked :class:`~msl.network.client.Client`\\s."""
+    def _notify_clients(self) -> None:
+        """Emit a notification to all linked Clients."""
         position, is_moving = self.status()
         angle = self.position_to_degrees(position)
         if is_moving and not self._stop_slowly_requested:
-            self.emit_notification(position, angle, is_moving)
-            self._emit_notification()  # re-emit
+            self.maybe_emit_notification(position, angle, is_moving)
+            self._notify_clients()  # re-emit
         else:
-            self.emit_notification(position, angle, False)
-            self._emitting_thread = None
-            self._stop_slowly_requested = False
+            self.maybe_emit_notification(position, angle, False)
 
-    def _wait(self, timeout) -> None:
-        t0 = time()
+    def _wait(self, timeout: float) -> None:
+        now = time.time
+        sleep = time.sleep
+        t0 = now()
         while True:
             _, is_moving = self.status()
             if not is_moving:
                 break
-            if time() - t0 > timeout:
+            if now() - t0 > timeout:
                 raise TimeoutError(
-                    f'{self.alias!r} did not finish moving with {timeout} seconds'
+                    f'{self.alias!r} did not finish moving within {timeout} seconds'
                 )
             sleep(0.01)

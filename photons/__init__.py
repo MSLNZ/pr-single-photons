@@ -1,23 +1,21 @@
 """
 Console script entry points.
 """
+import argparse
 import re
 import sys
 from collections import namedtuple
-from argparse import (
-    ArgumentParser,
-    RawTextHelpFormatter,
-)
 
-from msl.network.ssh import parse_console_script_kwargs
-from msl.network.service import filter_service_start_kwargs
-
-from .log import logger
-from .utils import Register
 from .app import App
+from .equipment import *
+from .io import PhotonWriter
+from .log import logger
+from .samples import Samples
+from . import plugins
+from . import services
 
 __author__ = 'Joseph Borbely'
-__copyright__ = '\xa9 2022 ' + __author__
+__copyright__ = f'\xa9 2022 {__author__}'
 __version__ = '0.1.0.dev0'
 
 _v = re.search(r'(\d+)\.(\d+)\.(\d+)[.-]?(.*)', __version__).groups()
@@ -26,85 +24,149 @@ version_info = namedtuple('version_info', 'major minor micro releaselevel')(int(
 """:obj:`~collections.namedtuple`: Contains the version information as a (major, minor, micro, releaselevel) tuple."""
 
 
-def cli_parser(*args):
+def _maybe_press_enter(no_user: bool) -> None:
+    if no_user:
+        return
+    input('Press <Enter> to exit... ')
+
+
+def _print_traceback(no_user: bool, *, msg: str = '') -> int:
+    import traceback
+    tb = ''.join(traceback.format_exception(*sys.exc_info()))
+    print(f'\n{tb}{msg}')
+    _maybe_press_enter(no_user)
+    return 1
+
+
+def cli_parser(*args: str) -> argparse.Namespace:
     """Parse the command line arguments."""
     if not args:
         args = sys.argv[1:]
 
-    p = ArgumentParser(
+    p = argparse.ArgumentParser(
         description='Light Standards Single Photons.',
-        formatter_class=RawTextHelpFormatter
+        formatter_class=argparse.RawTextHelpFormatter
     )
     p.add_argument(
         'config',
         nargs='?',
-        default=r'D:\config.xml',
-        help='the path to a configuration file'
+        help='the path to a configuration file (default is ~/photons.xml)'
     )
     p.add_argument(
         '--alias',
-        help='the alias of an EquipmentRecord'
+        help='the alias of an EquipmentRecord to start a generic equipment Service'
     )
     p.add_argument(
         '--name',
-        help='the name of the Service to start'
+        help='the name of a registered Service to start'
     )
     p.add_argument(
         '--kwargs',
-        help='keyword arguments that are used to start a Service, e.g.,\n'
-             '--kwargs {"host":"localhost","port":1875}'
+        help='keyword arguments that are passed to Service.start(), e.g.,\n'
+             '--kwargs "{\\"host\\":\\"localhost\\", \\"port\\":1876}"'
+    )
+    p.add_argument(
+        '--no-user',
+        action='store_true',
+        default=False,
+        help='if there was an error then do not wait for the user to acknowledge\n'
+             'the error by pressing <Enter>'
     )
     return p.parse_args(args)
 
 
-def create_app_and_gui(*args):
-    """Console script to create the :class:`~photons.app.App` and
-    show the :class:`~photons.gui.MainWindow`.
+def main(*args: str) -> None:
+    """Main console script entry point.
 
-    Usage
-    -----
-    create-app config.xml
+    Run ``photons --help`` for more details.
+
+    Args:
+        *args: Command-line arguments.
+
+    Examples:
+        - Start the main application using the default configuration path
+          ``photons``
+
+        - Start the main application using the specified configuration file
+          ``photons my_config.xml``
+
+        - Start an equipment Service (using the default configuration path)
+          ``photons --alias shutter``
+
+        - Start an equipment Service using the specified configuration file
+          ``photons my_config.xml --alias shutter``
+
+        - Start a registered Service and specify kwargs
+          ``photons --name MyService --kwargs "{\"host\":\"localhost\", \"port\":1876}"``
     """
     args = cli_parser(*args)
-    a = App(args.config)
-    a.gui()
+    if not (args.alias or args.name):
+        sys.exit(start_app(args.config, args.no_user))
+    sys.exit(start_service(**args.__dict__))
+
+
+def start_app(config: str, no_user: bool) -> int:
+    """Start the main application instance.
+
+    Args:
+        config: The path to a configuration file.
+        no_user: Whether to call input('Press <Enter> to exit... ') if there was an error.
+
+    Returns:
+        The exit code (0 for success, 1 for error).
+    """
+    try:
+        a = App(config)
+    except FileNotFoundError:
+        return _print_traceback(no_user)
+
+    a.run()
     a.disconnect_equipment()
     a.unlink()
-    a.disconnect_clients()
+    a.disconnect_managers()
+    return 0
 
 
-def start_service(*args):
-    """Console script to start a :class:`~msl.network.service.Service`.
+def start_service(
+        alias: str | None,
+        config: str | None,
+        name: str | None,
+        kwargs: str | None,
+        no_user: bool) -> int:
+    """Start a Service.
 
-    You must either specify the alias of an EquipmentRecord to run as a Service
-    or the name of a Service to start but not both.
+    Args:
+        alias: The alias of an EquipmentRecord to start a generic equipment Service.
+        config: The path to a configuration file. Not required if `name` is specified.
+        name: The name of a registered Service to start.
+        kwargs: The keyword arguments from the command line.
+        no_user: Whether to call input('Press <Enter> to exit... ') if there was an error.
 
-    Usage
-    -----
-    photons-start-service config.xml --alias superk --kwargs {"host":"localhost","port":1875}
-    photons-start-service config.xml --name MyService --kwargs {"host":"localhost","port":1875}
+    Returns:
+        The exit code (0 for success, 1 for error).
     """
-    press_enter_msg = '\nPress <Enter> to exit...'
-    args = cli_parser(*args)
+    if alias and name:
+        print(f'\nYou cannot specify both the alias ({alias!r}) and the '
+              f'name ({name!r}) to start a Service.')
+        _maybe_press_enter(no_user)
+        return 1
 
-    def print_exception():
-        import traceback
-        input('\n' + ''.join(traceback.format_exception(*sys.exc_info())) + press_enter_msg)
+    try:
+        from msl.network.ssh import parse_console_script_kwargs
+        kwargs = parse_console_script_kwargs()
+    except:  # noqa: Too broad exception clause (PEP8: E722)
+        return _print_traceback(no_user, msg=f'\nReceived the following kwargs: {kwargs}')
 
-    if not args.alias and not args.name:
-        input('\nYou must specify the alias or the name of a Service to start.\n' + press_enter_msg)
-    elif args.alias and args.name:
-        input('\nYou cannot specify both the alias and the name of a Service to start.\n' + press_enter_msg)
-    else:
-        kwargs = filter_service_start_kwargs(**parse_console_script_kwargs())
-        if args.alias:
-            try:
-                a = App(args.config)
-                a.start_equipment_service(args.alias, **kwargs)
-            except:
-                print_exception()
-        else:
-            try:
-                App.start_service(args.name, **kwargs)
-            except:
-                print_exception()
+    if alias:
+        try:
+            a = App(config)
+            a.start_equipment_service(alias, **kwargs)
+            return 0
+        except:  # noqa: Too broad exception clause (PEP8: E722)
+            return _print_traceback(no_user)
+
+    try:
+        App.start_service(name, **kwargs)
+        return 0
+    except:  # noqa: Too broad exception clause (PEP8: E722)
+        return _print_traceback(no_user)

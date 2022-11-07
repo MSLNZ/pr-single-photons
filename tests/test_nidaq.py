@@ -1,10 +1,8 @@
 import numpy as np
 
-from photons.equipment.nidaq import (
-    NIDAQ,
-    Trigger,
-    Timing,
-)
+from photons.equipment.nidaq import NIDAQ
+from photons.equipment.nidaq import Timing
+from photons.equipment.nidaq import Trigger
 
 
 def test_time_array():

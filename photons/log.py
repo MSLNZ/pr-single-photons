@@ -1,35 +1,6 @@
 """Logging configuration."""
-import os
 import logging
-
-
-def set_block(*names: str) -> None:
-    """Block all messages from the specified loggers."""
-    for name in names:
-        set_level(name, logging.CRITICAL+1)
-
-
-def set_errors(*names: str) -> None:
-    """Only show ERROR (and above) messages from the specified loggers."""
-    for name in names:
-        set_level(name, logging.ERROR)
-
-
-def set_warnings(*names: str) -> None:
-    """Only show WARNING (and above) messages from the specified loggers."""
-    for name in names:
-        set_level(name, logging.WARNING)
-
-
-def set_info(*names: str) -> None:
-    """Only show INFO (and above) messages from the specified loggers."""
-    for name in names:
-        set_level(name, logging.INFO)
-
-
-def set_level(name: str, level: int | str) -> None:
-    """Set the logging level for a particular logger."""
-    logging.getLogger(name).setLevel(level)
+import os
 
 
 def env_level(key: str = 'PHOTONS_LOG_LEVEL') -> int:
@@ -49,6 +20,41 @@ def env_level(key: str = 'PHOTONS_LOG_LEVEL') -> int:
         raise ValueError(f'Invalid log level {name!r}') from None
 
 
+def set_block(*names: str) -> None:
+    """Block all messages from the specified loggers."""
+    for name in names:
+        set_level(name, logging.CRITICAL+1)
+
+
+def set_debug(*names: str) -> None:
+    """Show DEBUG (and above) messages from the specified loggers."""
+    for name in names:
+        set_level(name, logging.DEBUG)
+
+
+def set_errors(*names: str) -> None:
+    """Show ERROR (and above) messages from the specified loggers."""
+    for name in names:
+        set_level(name, logging.ERROR)
+
+
+def set_info(*names: str) -> None:
+    """Show INFO (and above) messages from the specified loggers."""
+    for name in names:
+        set_level(name, logging.INFO)
+
+
+def set_level(name: str, level: int | str) -> None:
+    """Set the logging level for a particular logger."""
+    logging.getLogger(name).setLevel(level)
+
+
+def set_warnings(*names: str) -> None:
+    """Show WARNING (and above) messages from the specified loggers."""
+    for name in names:
+        set_level(name, logging.WARNING)
+
+
 logger = logging.getLogger(__package__)
 logger.setLevel(env_level())
 
@@ -60,4 +66,4 @@ logging.basicConfig(
 
 set_errors('asyncio', 'urllib3')
 set_block('pyvisa', 'pyvisa-py')
-set_warnings('msl')
+set_warnings('msl', 'google', 'googleapiclient')
