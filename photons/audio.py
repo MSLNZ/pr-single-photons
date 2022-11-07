@@ -5,9 +5,13 @@ import wave
 from enum import Enum
 from io import BytesIO
 from random import choice
+try:
+    import winsound
+except ImportError:
+    # ReadTheDocs uses linux to build to docs, so winsound is not available
+    winsound = None
 
 import numpy as np
-import winsound
 
 
 def _freq(i, j):
