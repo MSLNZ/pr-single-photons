@@ -129,6 +129,7 @@ else:
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+html_css_files = ['css/custom.css']
 
 # -- Options for HTMLHelp output ------------------------------------------
 
