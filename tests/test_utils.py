@@ -199,6 +199,9 @@ def test_array_photodiode_centre():
     for item in expected:
         assert item in randomized
 
+    assert np.array_equal(f(1.23, step=0, width=0), np.array([1.23]))
+    assert np.array_equal(f(100, step=0, width=10), np.array([100]))
+
 
 def test_ave_std(recwarn):
     a, s = utils.ave_std(np.array([]))

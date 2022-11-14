@@ -144,6 +144,8 @@ def array_photodiode_centre(
     Returns:
         The requested array.
     """
+    if step == 0:
+        return np.array([centre])
     half_width = width * 0.5
     region_width = step * round(width * 0.1 / step)
     rising = array_central(centre-half_width, region_width, step, decimals=decimals)
