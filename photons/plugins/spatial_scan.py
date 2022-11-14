@@ -362,6 +362,8 @@ class SpatialScan(BasePlugin):
         )
 
         self.filename_suffix = prompt.text('<i>Optional</i>: Specify a suffix for the filename')
+        if not prompt.yes_no('Start spatial scan?'):
+            return
         self.main.status_bar_message.emit(f'Running {self.windowTitle()}...')
         self.t0 = monotonic()
         self.thread.start(self)
