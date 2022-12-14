@@ -104,12 +104,20 @@ class Range(enum.IntEnum):
     nm600_1190 = 3
 
 
+class RangeModel(enum.IntEnum):
+    """Range models that are supported."""
+    OLD = 65535
+    ORDER = 65534
+    WAVELENGTH = 65533
+
+
 @equipment(manufacturer=r'High\s?Finesse')
 class HighFinesse(BaseEquipment):
 
     connection: WLMData32
 
     Range = Range
+    RangeModel = RangeModel
 
     def __init__(self, record: EquipmentRecord, **kwargs) -> None:
         """Communicate with a Wavemeter or Laser Spectrum Analyser from HighFinesse.
@@ -167,17 +175,16 @@ class HighFinesse(BaseEquipment):
         """Returns whether pulse mode is enabled (False=CW, True=Pulsed)."""
         return bool(self.connection.get_pulse_mode())
 
-    def get_wavelength_range(self) -> Range:
-        """Returns the currently-selected wavelength range."""
-        # TODO this try-except block fixes a bug in the DLL where a value of 65535
-        #  is returned if the 600-1190nm range is selected. HighFinesse has
-        #  been notified of the bug and are fixing it.
+    def get_wavelength_range(self) -> Range | RangeModel | int:
+        """Returns the currently-selected wavelength range or range model."""
         r = self.connection.get_range()
         try:
             return Range(r)
         except ValueError:
-            assert r == 65535
-            return Range.nm600_1190
+            try:
+                return RangeModel(r)
+            except ValueError:
+                return r
 
     def get_wide_mode(self) -> bool:
         """Returns the measurement precision mode (False=fine, True=wide)."""
@@ -240,11 +247,38 @@ class HighFinesse(BaseEquipment):
         self.logger.info(f'set pulse mode to {m!r} for {self.alias!r}')
         self.connection.set_pulse_mode(mode)
 
-    def set_wavelength_range(self, r: Range) -> None:
-        """Set the wavelength range."""
-        r = self.convert_to_enum(r, Range, to_upper=False)
-        self.logger.info(f'set wavelength range to {r!r} for {self.alias!r}')
-        self.connection.set_range(r.value)  # noqa: Expected type 'int', got '() -> int' instead
+    def set_wavelength_range(self, value: Range | int) -> None:
+        """Set the wavelength range.
+
+        .. important::
+
+           The :meth:`.set_wavelength_range_model` must be called before
+           this method is called in order to select the range model.
+
+        Args:
+            value: If the range model is :attr:`.RangeModel.ORDER`, the
+                wavelength range is set by a :class:`.Range` enum value.
+                If the range model is :attr:`.RangeModel.WAVELENGTH`, the
+                wavelength range is set by a wavelength value, in nm, as an
+                :class:`int` data type.
+        """
+        if isinstance(value, Range):
+            self.logger.info(f'set wavelength range to {value!r} for {self.alias!r}')
+            r = value.value
+        else:
+            self.logger.info(f'set wavelength range to {value} nm for {self.alias!r}')
+            r = value
+        self.connection.set_range(r)
+
+    def set_wavelength_range_model(self, model: RangeModel) -> None:
+        """Set the wavelength range model.
+
+        Args:
+            model: The wavelength range model.
+        """
+        m = self.convert_to_enum(model, RangeModel, to_upper=True)
+        self.logger.info(f'set wavelength range model to {m!r} for {self.alias!r}')
+        self.connection.set_range(m.value)  # noqa: Expected type 'int', got '() -> int' instead
 
     def set_wide_mode(self, mode: bool) -> None:
         """Set the measurement precision mode.
