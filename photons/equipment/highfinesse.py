@@ -222,6 +222,9 @@ class HighFinesse(BaseEquipment):
         """Set the exposure time, in milliseconds.
 
         This method will disable auto-exposure mode.
+
+        Args:
+            ms: The exposure time, in milliseconds.
         """
         self.set_auto_exposure_mode(False)
         self.logger.info(f'set exposure time to {ms} ms for {self.alias!r}')
@@ -237,11 +240,11 @@ class HighFinesse(BaseEquipment):
         self.logger.info(f'{text} linewidth mode of {self.alias!r}')
         self.connection.set_linewidth_mode(mode)
 
-    def set_pulse_mode(self, mode: bool | int) -> None:
+    def set_pulse_mode(self, mode: int | bool) -> None:
         """Set the pulse mode.
 
         Args:
-            mode: 0=CW, 1=Pulsed
+            mode: CW=0|False, Pulsed=1|True
         """
         m = 'Pulsed' if mode else 'CW'
         self.logger.info(f'set pulse mode to {m!r} for {self.alias!r}')
