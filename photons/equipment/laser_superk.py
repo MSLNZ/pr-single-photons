@@ -113,8 +113,9 @@ class SuperK(BaseEquipment):
 
         # suppress the warning that the following attributes cannot be made
         # available when starting the BaseEquipment as a Service
-        self.ignore_attributes('level_changed', 'emission_changed', 'signaler',
-                               'DEVICE_ID', 'MODULE_TYPE_0x60', 'MODULE_TYPE_0x88')
+        self.ignore_attributes(
+            'level_changed', 'emission_changed', 'mode_changed', 'signaler',
+            'DEVICE_ID', 'MODULE_TYPE_0x60', 'MODULE_TYPE_0x88')
 
         serial = self.connection.device_get_module_serial_number_str(SuperK.DEVICE_ID)
         if serial and serial != record.serial:
