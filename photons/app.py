@@ -533,7 +533,7 @@ class App(QtCore.QObject):
 
         s = service(record, **self.config.attrib(record.alias))
         s.running_as_service = True
-        s.set_logging_level(kwargs.pop('log_level'))
+        s.set_logging_level(kwargs.pop('log_level', 'INFO'))
         s.start(**kwargs)
 
     @staticmethod
@@ -564,7 +564,7 @@ class App(QtCore.QObject):
                 f'2. use @service(name={s.name!r})\n'
                 f'3. do not use a name with super() nor @service() [uses the class name instead]\n')
 
-        s.set_logging_level(kwargs.pop('log_level'))
+        s.set_logging_level(kwargs.pop('log_level', 'INFO'))
         s.start(**kwargs)
 
     def unlink(self, *names: str) -> None:
