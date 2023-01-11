@@ -15,7 +15,7 @@ from . import plugins
 from . import services
 
 __author__ = 'Joseph Borbely'
-__copyright__ = f'\xa9 2022 {__author__}'
+__copyright__ = f'\xa9 2022 - 2023 {__author__}'
 __version__ = '0.1.0.dev0'
 
 _v = re.search(r'(\d+)\.(\d+)\.(\d+)[.-]?(.*)', __version__).groups()
