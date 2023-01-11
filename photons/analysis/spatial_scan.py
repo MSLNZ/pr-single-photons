@@ -1,7 +1,7 @@
 import os
 import re
 import sys
-from xml.etree.cElementTree import ElementTree
+from xml.etree.ElementTree import ElementTree
 
 import numpy as np
 import pyqtgraph as pg
