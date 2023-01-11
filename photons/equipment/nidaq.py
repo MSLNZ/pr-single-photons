@@ -448,7 +448,7 @@ class NIDAQ(BaseEquipment):
         Returns:
             The number of edges per second.
         """
-        cps = np.full((nsamples,), np.nan, dtype=int)
+        cps = np.full((nsamples,), -2**63, dtype=np.int64)
 
         # using a Counter Output task as a gate for the Counter Input task
         edge = Edge.RISING if rising else Edge.FALLING
