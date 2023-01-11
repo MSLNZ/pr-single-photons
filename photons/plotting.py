@@ -214,7 +214,7 @@ class Plot(QtWidgets.QWidget):
             try:
                 self._drag_drop_root = read(paths[0])
                 event.accept()
-            except IOError:
+            except OSError:
                 event.ignore()
         else:
             event.ignore()
