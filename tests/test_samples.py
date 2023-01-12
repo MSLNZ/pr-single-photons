@@ -1916,3 +1916,54 @@ def test_type_n_afrikaans():
         assert f'{s:.8n}' == '12,345.6789(9,876.5432)'
 
     locale.setlocale(locale.LC_NUMERIC, original_loc)
+
+
+def test_to_ureal():
+    # cannot initialize if the mean or std are NaN
+    with pytest.raises(ValueError, match='nan'):
+        Samples().to_ureal()
+    with pytest.raises(ValueError, match='nan'):
+        Samples([1]).to_ureal()
+    with pytest.raises(ValueError, match='nan'):
+        Samples(mean=1).to_ureal()
+    with pytest.raises(ValueError, match='nan'):
+        Samples(std=1).to_ureal()
+
+    # or if the dof is < 1
+    with pytest.raises(ValueError, match='0'):
+        Samples(mean=1.2, std=0.5, size=1).to_ureal()
+
+    s = Samples(mean=1.234, std=0.032145)
+    un = s.to_ureal()
+    assert un.x == 1.234
+    assert un.u == 0.032145
+    assert math.isinf(un.df)
+    assert un.label is None
+
+    s = Samples(mean=1.234, std=0.032145, size=100)
+    un = s.to_ureal()
+    assert un.x == 1.234
+    assert un.u == 0.032145
+    assert un.df == 99
+    assert un.label is None
+
+    s = Samples([1, 1])
+    un = s.to_ureal()
+    assert un.x == 1.0
+    assert un.u == 0.0
+    assert math.isinf(un.df)  # since the uncertainty is 0
+    assert un.label is None
+
+    s = Samples([1, 2])
+    un = s.to_ureal()
+    assert un.x == pytest.approx(1.5)
+    assert un.u == pytest.approx(0.707106781186548)
+    assert un.df == 1
+    assert un.label is None
+
+    s = Samples(range(10))
+    un = s.to_ureal(label='range')
+    assert un.x == pytest.approx(4.5)
+    assert un.u == pytest.approx(3.02765035409749)
+    assert un.df == 9
+    assert un.label == 'range'

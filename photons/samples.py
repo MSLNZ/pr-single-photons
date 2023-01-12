@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Sequence
 
 import numpy as np
+from GTC import ureal
+from GTC.lib import UncertainReal
 
 # The regular expression to parse a format specification (format_spec)
 # with additional (and optional) characters at the end for custom fields.
@@ -443,6 +445,12 @@ class Samples:
             'size': self._size,
             'overload': self._overload
         }
+
+    def to_ureal(self, label: str = None, independent: bool = True) -> UncertainReal:
+        """Convert to an uncertain-real number."""
+        df = self._size - 1 if self._size > 0 else math.inf
+        return ureal(self._mean, self._std, df=df, label=label,
+                     independent=independent)
 
     @property
     def variance(self) -> float:
