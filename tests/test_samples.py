@@ -103,7 +103,7 @@ def test_mean_std(recwarn):
     assert math.isnan(s.relative_std)
     assert math.isnan(s.variance)
 
-    for samples in [[], (), {}, '', '\r', '\r\n']:
+    for samples in [[], (), {}, '', '  ', '\r', '\n', '\r\n', ' \r \n ']:
         s = Samples(samples)
         assert s.samples.size == 0
         assert math.isnan(s.mean)
