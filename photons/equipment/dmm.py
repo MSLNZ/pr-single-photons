@@ -234,7 +234,7 @@ class DMM(BaseEquipment):
         Returns:
            The average value and the standard deviation.
         """
-        self.logger.info(f'fetch {self.alias!r} {samples}')
+        self.logger.info(f'fetch {self.alias!r} samples={samples!r}')
         s = Samples(samples)
         self.fetched.emit(s)
         self.maybe_emit_notification(s.mean, s.std)
