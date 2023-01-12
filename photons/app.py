@@ -140,8 +140,6 @@ class App(QtCore.QObject):
             # first, see if a Link can be established
             if arg in self.links:
                 logger.info(f'created a connection to {arg!r} via a Link')
-                # TODO should it be popped so that the object is not in both
-                #  self.connections and self.links?
                 self.connections[arg] = self.links.pop(arg)
                 self.added_connection.emit(arg)
                 continue
@@ -325,6 +323,8 @@ class App(QtCore.QObject):
                 options.append((client, list(ids['services'])))
 
         for name in names:
+            if name in self.connections and isinstance(self.connections[name], Link):
+                continue
             if name in self.links:
                 logger.info(f'already linked with {name!r}')
                 continue
