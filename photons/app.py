@@ -268,6 +268,8 @@ class App(QtCore.QObject):
                 continue
 
             if isinstance(self.connections[arg], Link):
+                if arg == 'superk':
+                    self.connections[arg].set_user_text('')
                 self.connections[arg].unlink()
                 logger.info(f'unlinked from {arg!r}')
             else:

@@ -6,6 +6,7 @@ import queue
 from msl.equipment.exceptions import NKTError
 from msl.qt import ComboBox
 from msl.qt import DoubleSpinBox
+from msl.qt import LineEdit
 from msl.qt import QtCore
 from msl.qt import QtGui
 from msl.qt import QtWidgets
@@ -110,6 +111,11 @@ class SuperKWidget(BaseEquipmentWidget):
             tooltip='Turn the laser emission on or off',
         )
 
+        self.user_text = LineEdit(
+            text=connection.get_user_text(),
+            text_changed=self.on_user_text_changed
+        )
+
         # link the DLL callback(s) and the Qt Signal to the Slots
         if not self.connected_as_link:
             connection.signaler.device_status_changed.connect(self.on_device_status_changed)
@@ -123,6 +129,7 @@ class SuperKWidget(BaseEquipmentWidget):
         layout = QtWidgets.QFormLayout()
         layout.addRow('Mode:', box)
         layout.addRow('Emission:', self.emission_switch)
+        layout.addRow('User Text:', self.user_text)
         self.setLayout(layout)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
@@ -178,6 +185,11 @@ class SuperKWidget(BaseEquipmentWidget):
         previous = self.emission_switch.blockSignals(True)
         self.emission_switch.setChecked(state)
         self.emission_switch.blockSignals(previous)
+
+    @Slot(str)
+    def on_user_text_changed(self, text: str) -> None:
+        """Set the user text."""
+        self.connection.set_user_text(text)
 
     def update_mode(self, mode: int) -> None:
         """Update the ComboBox without emitting the signal."""
