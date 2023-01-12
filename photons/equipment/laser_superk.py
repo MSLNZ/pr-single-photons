@@ -147,7 +147,8 @@ class SuperK(BaseEquipment):
             self.raise_exception(f'{self.alias!r} port status is {status!r}')
 
         self.ensure_interlock_ok()
-        if record.connection.properties.get('lock_front_panel', False):
+        if record.connection.properties.get('lock_front_panel', False) or \
+                kwargs.get('lock_front_panel', False):
             self.lock_front_panel(True)
 
         if not SuperK._callbacks_registered:
