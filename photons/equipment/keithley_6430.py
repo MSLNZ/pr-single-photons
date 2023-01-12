@@ -62,8 +62,8 @@ class Keithley6430(DMM):
 
         If there is an error then raise an exception.
         """
-        message = self.connection.query(':SYSTEM:ERROR:NEXT?').rstrip()
-        if message != '0,"No error"':
+        message = self.connection.query(':SYSTEM:ERROR:NEXT?')
+        if not message.startswith('0,'):
             self.raise_exception(message)
 
     def configure(self,
@@ -203,7 +203,7 @@ class Keithley6430(DMM):
 
     def is_output_enabled(self) -> bool:
         """Returns whether the source output is on or off."""
-        return self.connection.query(':OUTPUT?').rstrip() == '1'
+        return self.connection.query(':OUTPUT?').startswith('1')
 
     def is_output_stable(self, tol: float = 1e-3) -> bool:
         """Whether the output level has stabilized.

@@ -180,11 +180,11 @@ class ComboSource(BaseEquipment):
 
     def is_laser_enabled(self) -> bool:
         """Checks if the laser is lasing."""
-        return self.connection.query('LASER:OUTPUT?').rstrip() == '1'
+        return self.connection.query('LASER:OUTPUT?').startswith('1')
 
     def is_tec_enabled(self) -> bool:
         """Checks if the TEC is enabled or disabled."""
-        return self.connection.query('TEC:OUTPUT?').rstrip() == '1'
+        return self.connection.query('TEC:OUTPUT?').startswith('1')
 
     def laser_off(self) -> None:
         """Turn the laser output off."""
@@ -367,6 +367,6 @@ class ComboSource(BaseEquipment):
         self.logger.info(f'{self.alias!r} stable')
 
     def _check(self, command: str) -> None:
-        reply = self.connection.query(f'{command};ERRSTR?').rstrip()
-        if self._strict and reply != '0':
+        reply = self.connection.query(f'{command};ERRSTR?')
+        if self._strict and not reply.startswith('0'):
             self.raise_exception(f'command={command!r}, reply={reply!r}')

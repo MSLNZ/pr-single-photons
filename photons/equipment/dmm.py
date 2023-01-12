@@ -203,7 +203,7 @@ class DMM(BaseEquipment):
         if initiate:
             self.logger.info(f'send INIT to {self.alias!r}')
             self.connection.write('INIT')
-        samples = self.connection.query('FETCH?').rstrip()
+        samples = self.connection.query('FETCH?')
         return self._average_and_emit(samples)
 
     def reset(self) -> None:

@@ -34,8 +34,8 @@ class Keysight344XXA(DMM):
 
         If there is an error then raise an exception.
         """
-        message = self.connection.query('SYSTEM:ERROR:NEXT?').rstrip()
-        if message != '+0,"No error"':
+        message = self.connection.query('SYSTEM:ERROR:NEXT?')
+        if not message.startswith('+0,'):
             self.raise_exception(message)
 
     def configure(self,

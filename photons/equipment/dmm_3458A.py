@@ -92,8 +92,8 @@ class Keysight3458A(DMM):
 
         If there is an error then raise an exception.
         """
-        message = self.connection.query('ERRSTR?').rstrip()
-        if not message == '0,"NO ERROR"':
+        message = self.connection.query('ERRSTR?')
+        if not message.startswith('0,'):
             self.raise_exception(message)
 
     def clear(self) -> None:
