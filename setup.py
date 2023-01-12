@@ -148,6 +148,7 @@ install_requires = [
     'google-api-python-client',
     'google-auth-httplib2',
     'google-auth-oauthlib',
+    'GTC',
     'msl-equipment @ git+https://github.com/MSLNZ/msl-equipment.git',
     'msl-network',
     'msl-package-manager',
