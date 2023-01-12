@@ -276,7 +276,7 @@ class Samples:
         if isinstance(samples, str):
             stripped = samples.rstrip()
             if stripped:
-                self._samples = np.array(samples.split(','), dtype=float)
+                self._samples = np.array(stripped.split(','), dtype=float)
             else:
                 self._samples = np.empty(0)
         elif isinstance(samples, np.ndarray):
