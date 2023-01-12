@@ -47,7 +47,7 @@ class BaseEquipment(QtCore.QObject, Service):
             ignore_attributes=ignore_attributes
         )
 
-        self._notifications_allowed: bool = kwargs.get('emit_notifications', True)
+        self._emit_notifications: bool = bool(kwargs.get('emit_notifications', True))
 
         self.record: EquipmentRecord = record
         self.alias: str = record.alias
@@ -90,7 +90,7 @@ class BaseEquipment(QtCore.QObject, Service):
     @property
     def notifications_allowed(self) -> bool:
         """Returns whether notifications are allowed to be sent to Clients."""
-        return self.running_as_service and self._notifications_allowed
+        return self.running_as_service and self._emit_notifications and self.loop_thread_id
 
     def raise_exception(self, message: str | Exception) -> None:
         """Log the message then raise an exception."""
