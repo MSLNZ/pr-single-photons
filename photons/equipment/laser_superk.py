@@ -154,7 +154,7 @@ class SuperK(BaseEquipment):
             self.signaler = register_callbacks(self)
             SuperK._callbacks_registered = True
 
-        self.set_user_text(kwargs.get('user_text', 'In use by Joe'))
+        self.set_user_text(kwargs.get('user_text', f'SuperK {record.serial}'))
 
     def emission(self, enable: bool) -> None:
         """Turn the laser emission on or off.
