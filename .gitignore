@@ -49,3 +49,7 @@ condatests.ini
 # files and directories specifc to pr-single-photons
 scratches/
 *config*.xml
+
+# JupyterLab
+.ipynb_checkpoints/
+Untitled*.ipynb
