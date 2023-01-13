@@ -72,6 +72,12 @@ def cli_parser(*args: str) -> argparse.Namespace:
         help='if there was an error then do not wait for the user to acknowledge\n'
              'the error by pressing <Enter>'
     )
+    p.add_argument(
+        '--jupyter',
+        action='store_true',
+        default=False,
+        help='start a JupyterLab web server'
+    )
     return p.parse_args(args)
 
 
@@ -81,36 +87,43 @@ def main(*args: str) -> None:
     Run ``photons --help`` for more details.
 
     Args:
-        *args: Command-line arguments.
+        args: Command-line arguments.
 
     Examples:
-        - Start the main application using the default configuration path
-          ``photons``
 
-        - Start the main application using the specified configuration file
-          ``photons my_config.xml``
+        * | Start the main application using the default configuration path
+          | ``photons``
 
-        - Start an equipment Service (using the default configuration path)
-          ``photons --alias shutter``
+        * | Start the main application using the specified configuration file
+          | ``photons my_config.xml``
 
-        - Start an equipment Service using the specified configuration file
-          ``photons my_config.xml --alias shutter``
+        * | Start an equipment Service (using the default configuration path)
+          | ``photons --alias shutter``
 
-        - Start a registered Service and specify kwargs
-          ``photons --name MyService --kwargs "{\"host\":\"localhost\", \"port\":1876}"``
+        * | Start an equipment Service using the specified configuration file
+          | ``photons my_config.xml --alias shutter``
+
+        * | Start a registered Service and specify kwargs
+          | ``photons --name MyService --kwargs "{\\"host\\":\\"localhost\\", \\"port\\":1876}"``
+
+        * | Start a JupyterLab web server
+          | ``photons --jupyter``
+
     """
     args = cli_parser(*args)
+    if args.jupyter:
+        sys.exit(start_jupyter(args.config))
     if not (args.alias or args.name):
         sys.exit(start_app(args.config, args.no_user))
     sys.exit(start_service(**args.__dict__))
 
 
-def start_app(config: str, no_user: bool) -> int:
+def start_app(config: str | None, no_user: bool) -> int:
     """Start the main application instance.
 
     Args:
         config: The path to a configuration file.
-        no_user: Whether to call input('Press <Enter> to exit... ') if there was an error.
+        no_user: Whether to call *input('Press <Enter> to exit... ')* if there was an error.
 
     Returns:
         The exit code (0 for success, 1 for error).
@@ -140,7 +153,7 @@ def start_service(
         config: The path to a configuration file. Not required if `name` is specified.
         name: The name of a registered Service to start.
         kwargs: The keyword arguments from the command line.
-        no_user: Whether to call input('Press <Enter> to exit... ') if there was an error.
+        no_user: Whether to call *input('Press <Enter> to exit... ')* if there was an error.
 
     Returns:
         The exit code (0 for success, 1 for error).
@@ -170,3 +183,30 @@ def start_service(
         return 0
     except:  # noqa: Too broad exception clause (PEP8: E722)
         return _print_traceback(no_user)
+
+
+def start_jupyter(config: str | None) -> None:
+    """Start a Jupyter web server.
+
+    Args:
+        config: The path to a configuration file.
+    """
+    import os
+    from datetime import date
+
+    a = App(config)
+    root = a.config.value('data_root')
+    if not root:
+        raise ValueError(
+            'Must create a <data_root> element in the configuration file')
+
+    # create the sub-folders (use the zero-padded format codes)
+    today = date.today()
+    root = os.path.join(root, today.strftime('%Y'), today.strftime('%m'), today.strftime('%d'))
+    if not os.path.isdir(root):
+        os.makedirs(root)
+
+    try:
+        os.system(f'jupyter lab --notebook-dir={root}')
+    except KeyboardInterrupt:
+        pass
