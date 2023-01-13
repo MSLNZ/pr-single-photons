@@ -210,6 +210,7 @@ epub_exclude_files = ['search.html']
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
+    'GTC': ('https://gtc.readthedocs.io/en/stable/', None),
     'nidaqmx': ('https://nidaqmx-python.readthedocs.io/en/stable/', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
     'msl.equipment': ('https://msl-equipment.readthedocs.io/en/latest/', None),
