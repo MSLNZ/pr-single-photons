@@ -141,11 +141,13 @@ def start_app(config: str | None, no_user: bool) -> int:
 
 
 def start_service(
-        alias: str | None,
-        config: str | None,
-        name: str | None,
-        kwargs: str | None,
-        no_user: bool) -> int:
+        *,
+        alias: str = None,
+        config: str = None,
+        name: str = None,
+        kwargs: str = None,
+        no_user: bool = False,
+        **ignored) -> int:  # noqa: Parameter 'ignored' value is not used
     """Start a Service.
 
     Args:
@@ -154,6 +156,7 @@ def start_service(
         name: The name of a registered Service to start.
         kwargs: The keyword arguments from the command line.
         no_user: Whether to call *input('Press <Enter> to exit... ')* if there was an error.
+        ignored: All other keyword arguments are ignored.
 
     Returns:
         The exit code (0 for success, 1 for error).
