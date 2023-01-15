@@ -229,3 +229,15 @@ nitpicky = True
 nitpick_ignore = [
     ('py:class', '_ctypes.Structure'),
 ]
+
+
+def resolve_gtc_alias(app, env, node, contnode):
+    """Resolve GTC.lib.UncertainReal as lib.UncertainReal."""
+    if node['reftarget'] == 'GTC.lib.UncertainReal':
+        node['reftarget'] = 'lib.UncertainReal'
+        from sphinx.ext.intersphinx import missing_reference
+        return missing_reference(app, env, node, contnode)
+
+
+def setup(app):
+    app.connect('missing-reference', resolve_gtc_alias)
