@@ -73,7 +73,7 @@ def cli_parser(*args: str) -> argparse.Namespace:
              'the error by pressing <Enter>'
     )
     p.add_argument(
-        '--jupyter',
+        '-j', '--jupyter',
         action='store_true',
         default=False,
         help='start a JupyterLab web server'
@@ -112,7 +112,7 @@ def main(*args: str) -> None:
     """
     args = cli_parser(*args)
     if args.jupyter:
-        sys.exit(start_jupyter(args.config))
+        sys.exit(start_jupyter(args.config, args.no_user))
     if not (args.alias or args.name):
         sys.exit(start_app(args.config, args.no_user))
     sys.exit(start_service(**args.__dict__))
@@ -130,7 +130,7 @@ def start_app(config: str | None, no_user: bool) -> int:
     """
     try:
         a = App(config)
-    except FileNotFoundError:
+    except OSError:
         return _print_traceback(no_user)
 
     a.run()
@@ -185,28 +185,32 @@ def start_service(
         return _print_traceback(no_user)
 
 
-def start_jupyter(config: str | None) -> None:
+def start_jupyter(config: str | None, no_user: bool) -> int:
     """Start a Jupyter web server.
 
     Args:
         config: The path to a configuration file.
+        no_user: Whether to call *input('Press <Enter> to exit... ')* if there was an error.
+
+    Returns:
+        The exit code (0 for success, 1 for error).
     """
     import os
-    from datetime import date
-
-    a = App(config)
-    root = a.config.value('data_root')
-    if not root:
-        raise ValueError(
-            'Must create a <data_root> element in the configuration file')
-
-    # create the sub-folders (use the zero-padded format codes)
-    today = date.today()
-    root = os.path.join(root, today.strftime('%Y'), today.strftime('%m'), today.strftime('%d'))
-    if not os.path.isdir(root):
-        os.makedirs(root)
 
     try:
-        os.system(f'jupyter lab --notebook-dir={root}')
+        a = App(config)
+    except OSError:
+        return _print_traceback(no_user)
+
+    command = 'jupyter lab'
+    data_root = a.config.value('data_root')
+    if data_root:
+        command += f' --notebook-dir={data_root}'
+    else:
+        a.logger.info('create a <data_root> element in the configuration '
+                      'file to change the root notebook directory')
+
+    try:
+        os.system(command)
     except KeyboardInterrupt:
-        pass
+        return 0
