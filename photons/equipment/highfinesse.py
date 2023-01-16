@@ -274,7 +274,7 @@ class HighFinesse(BaseEquipment):
             r = value
         self.connection.set_range(r)
 
-    def set_wavelength_range_model(self, model: RangeModel) -> None:
+    def set_wavelength_range_model(self, model: RangeModel | int) -> None:
         """Set the wavelength range model.
 
         Args:
