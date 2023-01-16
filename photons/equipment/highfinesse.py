@@ -129,6 +129,7 @@ class HighFinesse(BaseEquipment):
                 of the element equal to the alias of `record`).
         """
         super().__init__(record, **kwargs)
+        self.ignore_attributes('Range', 'RangeModel')
 
     def get_analysis_mode(self) -> bool:
         """Whether analysis mode is enabled or disabled."""
@@ -338,3 +339,18 @@ class HighFinesse(BaseEquipment):
             # cReturnWavelengthAir = 1
             return self.connection.convert_unit(w, 0, 1)
         return w
+
+    @staticmethod
+    def wavelength_ranges() -> dict[str, int]:
+        """Returns the available wavelength ranges for the Laser Spectrum Analyser."""
+        return {'245-325nm': Range.nm245_325,
+                '320-420nm': Range.nm320_420,
+                '410-610nm': Range.nm410_610,
+                '600-1190nm': Range.nm600_1190}
+
+    @staticmethod
+    def wavelength_range_models() -> dict[str, int]:
+        """Returns the available wavelength range models for the Laser Spectrum Analyser."""
+        return {'old': RangeModel.OLD,
+                'order': RangeModel.ORDER,
+                'wavelength': RangeModel.WAVELENGTH}
