@@ -81,7 +81,7 @@ class BaseEquipment(QtCore.QObject, Service):
 
     def maybe_emit_notification(self, *args, **kwargs) -> None:
         """Emit a notification to all Clients that are linked with this Service."""
-        if self.notifications_allowed:
+        if self.notifications_allowed and self.loop_thread_id:
             if threading.get_ident() == self.loop_thread_id:
                 self.emit_notification(*args, **kwargs)
             else:
@@ -90,7 +90,7 @@ class BaseEquipment(QtCore.QObject, Service):
     @property
     def notifications_allowed(self) -> bool:
         """Returns whether notifications are allowed to be sent to Clients."""
-        return self.running_as_service and self._emit_notifications and self.loop_thread_id
+        return self.running_as_service and self._emit_notifications
 
     def raise_exception(self, message: str | Exception) -> None:
         """Log the message then raise an exception."""
