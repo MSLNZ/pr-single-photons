@@ -43,3 +43,15 @@ def test_invalid_alias():
     assert stdout.endswith(b"No EquipmentRecord exists with the alias 'a'")
 
     os.remove(file)
+
+
+def test_find():
+    code, stdout = run('--find')
+    assert code == 0
+    assert stdout.startswith(b'Finding COM, USB and LAN devices (LAN timeout is 2.0 seconds)...')
+
+
+def test_find_with_timeout():
+    code, stdout = run('-f 0.4')
+    assert code == 0
+    assert stdout.startswith(b'Finding COM, USB and LAN devices (LAN timeout is 0.4 seconds)...')

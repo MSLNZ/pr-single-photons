@@ -66,6 +66,14 @@ def cli_parser(*args: str) -> argparse.Namespace:
              '--kwargs "{\\"host\\":\\"localhost\\", \\"port\\":1876}"'
     )
     p.add_argument(
+        '-f', '--find',
+        nargs='?',
+        type=float,
+        const=2.0,
+        help='find COM, USB and LAN devices, the optional value corresponds to the\n'
+             'timeout for LAN devices (default is 2 seconds)'
+    )
+    p.add_argument(
         '--no-user',
         action='store_true',
         default=False,
@@ -109,10 +117,20 @@ def main(*args: str) -> None:
         * | Start a JupyterLab web server
           | ``photons --jupyter``
 
+        * | Find COM, USB and LAN devices
+          | ``photons --find``
+
+        * | Find COM, USB and LAN devices (with a 5-second timeout for LAN devices)
+          | ``photons --find 5``
+
     """
     args = cli_parser(*args)
     if args.jupyter:
         sys.exit(start_jupyter(args.config, args.no_user))
+    if args.find is not None:
+        print(f'Finding COM, USB and LAN devices (LAN timeout is {args.find} seconds)...\n')
+        from msl.equipment import print_resources
+        sys.exit(print_resources(timeout=args.find))
     if not (args.alias or args.name):
         sys.exit(start_app(args.config, args.no_user))
     sys.exit(start_service(**args.__dict__))
