@@ -46,7 +46,7 @@ _format_spec_regex = re.compile(
 
 _exponent_regex = re.compile(r'[eE][+-]\d+')
 
-_si_map = {i*3: c for i, c in enumerate('yzafpnum kMGTPEZY', start=-8)}
+_si_map = {i*3: c for i, c in enumerate('qryzafpnum kMGTPEZYRQ', start=-10)}
 
 _unicode_superscripts = {
     ord('+'): '\u207A',
@@ -89,13 +89,13 @@ def si_prefix_factor(exponent: int) -> tuple[str, float]:
     prefix = _si_map.get(exponent - mod)
     factor = 10. ** mod
     if exponent < 0 and prefix is None:
-        prefix = 'y'
-        factor = 10. ** (exponent + 24)
+        prefix = 'q'
+        factor = 10. ** (exponent + 30)
     elif 0 <= exponent < 3:
         prefix = ''
     elif prefix is None:
-        prefix = 'Y'
-        factor = 10. ** (exponent - 24)
+        prefix = 'Q'
+        factor = 10. ** (exponent - 30)
     return prefix, factor
 
 

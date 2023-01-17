@@ -1400,29 +1400,53 @@ def test_plus_minus():
 
 
 def test_si_prefix_factor():
-    prefix, factor = si_prefix_factor(-30)
-    assert prefix == 'y'
+    prefix, factor = si_prefix_factor(-36)
+    assert prefix == 'q'
     assert factor == 1e-6
 
-    prefix, factor = si_prefix_factor(-29)
-    assert prefix == 'y'
+    prefix, factor = si_prefix_factor(-35)
+    assert prefix == 'q'
     assert factor == 1e-5
 
-    prefix, factor = si_prefix_factor(-28)
-    assert prefix == 'y'
+    prefix, factor = si_prefix_factor(-34)
+    assert prefix == 'q'
     assert factor == 1e-4
 
-    prefix, factor = si_prefix_factor(-27)
-    assert prefix == 'y'
+    prefix, factor = si_prefix_factor(-33)
+    assert prefix == 'q'
     assert factor == 1e-3
 
-    prefix, factor = si_prefix_factor(-26)
-    assert prefix == 'y'
+    prefix, factor = si_prefix_factor(-32)
+    assert prefix == 'q'
     assert factor == 1e-2
 
-    prefix, factor = si_prefix_factor(-25)
-    assert prefix == 'y'
+    prefix, factor = si_prefix_factor(-31)
+    assert prefix == 'q'
     assert factor == 1e-1
+
+    prefix, factor = si_prefix_factor(-30)
+    assert prefix == 'q'
+    assert factor == 1e0
+
+    prefix, factor = si_prefix_factor(-29)
+    assert prefix == 'q'
+    assert factor == 1e1
+
+    prefix, factor = si_prefix_factor(-28)
+    assert prefix == 'q'
+    assert factor == 1e2
+
+    prefix, factor = si_prefix_factor(-27)
+    assert prefix == 'r'
+    assert factor == 1e0
+
+    prefix, factor = si_prefix_factor(-26)
+    assert prefix == 'r'
+    assert factor == 1e1
+
+    prefix, factor = si_prefix_factor(-25)
+    assert prefix == 'r'
+    assert factor == 1e2
 
     prefix, factor = si_prefix_factor(-24)
     assert prefix == 'y'
@@ -1629,30 +1653,66 @@ def test_si_prefix_factor():
     assert factor == 1e2
 
     prefix, factor = si_prefix_factor(27)
-    assert prefix == 'Y'
-    assert factor == 1e3
+    assert prefix == 'R'
+    assert factor == 1e0
 
     prefix, factor = si_prefix_factor(28)
-    assert prefix == 'Y'
-    assert factor == 1e4
+    assert prefix == 'R'
+    assert factor == 1e1
 
     prefix, factor = si_prefix_factor(29)
-    assert prefix == 'Y'
-    assert factor == 1e5
+    assert prefix == 'R'
+    assert factor == 1e2
 
     prefix, factor = si_prefix_factor(30)
-    assert prefix == 'Y'
+    assert prefix == 'Q'
+    assert factor == 1e0
+
+    prefix, factor = si_prefix_factor(31)
+    assert prefix == 'Q'
+    assert factor == 1e1
+
+    prefix, factor = si_prefix_factor(32)
+    assert prefix == 'Q'
+    assert factor == 1e2
+
+    prefix, factor = si_prefix_factor(33)
+    assert prefix == 'Q'
+    assert factor == 1e3
+
+    prefix, factor = si_prefix_factor(34)
+    assert prefix == 'Q'
+    assert factor == 1e4
+
+    prefix, factor = si_prefix_factor(35)
+    assert prefix == 'Q'
+    assert factor == 1e5
+
+    prefix, factor = si_prefix_factor(36)
+    assert prefix == 'Q'
     assert factor == 1e6
 
 
 def test_si():
+    s = Samples(mean=2.37216512e-32, std=1.3721356e-32)
+    assert f'{s:.1S}' == '0.02(1) q'
+    assert f'{s:.3PS}' == '(0.0237+/-0.0137) q'
+
     s = Samples(mean=4.638174e-30, std=0.0635119e-30)
-    assert f'{s:.2S}' == '0.000004638(64) y'
-    assert f'{s:.1PS}' == '(0.00000464+/-0.00000006) y'
+    assert f'{s:.2S}' == '4.638(64) q'
+    assert f'{s:.1PS}' == '(4.64+/-0.06) q'
+
+    s = Samples(mean=8.2621518e-29, std=0.00826725e-29)
+    assert f'{s:.3S}' == '82.6215(827) q'
+    assert f'{s:.1PS}' == '(82.62+/-0.08) q'
+
+    s = Samples(mean=6.547251e-27, std=0.07541268e-27)
+    assert f'{s:.1S}' == '6.55(8) r'
+    assert f'{s:PS}' == '(6.547+/-0.075) r'
 
     s = Samples(mean=9.092349e-25, std=0.0038964e-25)
-    assert f'{s:.3S}' == '0.909235(390) y'
-    assert f'{s:PS}' == '(0.90923+/-0.00039) y'
+    assert f'{s:.3S}' == '909.235(390) r'
+    assert f'{s:PS}' == '(909.23+/-0.39) r'
 
     s = Samples(mean=5.206637324e-24, std=0.415002e-24)
     assert f'{s:.1S}' == '5.2(4) y'
@@ -1743,9 +1803,33 @@ def test_si():
     assert f'{s:.1S}' == '32.74(5) Z'
     assert f'{s:.1PS}' == '(32.74+/-0.05) Z'
 
+    s = Samples(mean=4.32184e24, std=0.0005879417e24)
+    assert f'{s:.3S}' == '4.321840(588) Y'
+    assert f'{s:.2PS}' == '(4.32184+/-0.00059) Y'
+
+    s = Samples(mean=752.987235265e24, std=0.32198187e24)
+    assert f'{s:.1S}' == '753.0(3) Y'
+    assert f'{s:.3PS}' == '(752.987+/-0.322) Y'
+
     s = Samples(mean=1.638324e27, std=0.773148e27)
-    assert f'{s:S}' == '1640(770) Y'
-    assert f'{s:.4PS}' == '(1638.3+/-773.1) Y'
+    assert f'{s:S}' == '1.64(77) R'
+    assert f'{s:.4PS}' == '(1.6383+/-0.7731) R'
+
+    s = Samples(mean=9.276154e28, std=0.02473e28)
+    assert f'{s:.2S}' == '92.76(25) R'
+    assert f'{s:.2PS}' == '(92.76+/-0.25) R'
+
+    s = Samples(mean=0.876236e30, std=0.009236721e30)
+    assert f'{s:.1S}' == '876(9) R'
+    assert f'{s:.2PS}' == '(876.2+/-9.2) R'
+
+    s = Samples(mean=4.32687514e31, std=0.9211314e31, overload=1e99)
+    assert f'{s:.3S}' == '43.27(9.21) Q'
+    assert f'{s:.1PS}' == '(43+/-9) Q'
+
+    s = Samples(mean=7.582761830927e34, std=0.027125e34, overload=1e99)
+    assert f'{s:.1S}' == '75800(300) Q'
+    assert f'{s:.4PS}' == '(75827.6+/-271.2) Q'
 
 
 def test_iterable():
