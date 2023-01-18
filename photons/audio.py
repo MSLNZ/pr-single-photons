@@ -34,7 +34,7 @@ NOTES.update(dict(
 ))
 
 
-class Themes(Enum):
+class Theme(Enum):
     """Short theme clips to play as a WAV file."""
 
     MARIO = 'mario'
@@ -131,16 +131,16 @@ class Song:
             winsound.PlaySound(buffer.getvalue(), winsound.SND_MEMORY)
 
 
-def play(wav: str | Themes, wait: bool = True) -> None:
+def play(wav: str | Theme, wait: bool = True) -> None:
     """Play a WAV file or theme.
 
     Args:
-        wav: The file or theme to play.
+        wav: A file or theme to play.
         wait: Whether to wait for the WAV file to finish playing before returning.
-            Only used if `wav` is a file. Specifying one of the :class:`Themes`
-            will always wait, since the audio data is stored in memory.
+            Only used if `wav` is a file. Specifying a :class:`.Theme` will
+            always wait, since the audio data is stored in memory.
     """
-    if wav == Themes.MARIO:
+    if wav == Theme.MARIO:
         song = Song(tempo=400)
         song.add(song.QUARTER, 'C3')
         song.add(song.QUARTER, 'C4')
@@ -170,7 +170,7 @@ def play(wav: str | Themes, wait: bool = True) -> None:
         song.add(song.QUARTER, 'A#5')
         song.add(song.WHOLE, 'C6')
         song.play()
-    elif wav == Themes.TETRIS:
+    elif wav == Theme.TETRIS:
         song = Song(tempo=160)
         song.add(song.QUARTER, 'E5', 'E4')
         song.add(song.EIGHTH, 'B4', 'B3')
@@ -193,7 +193,7 @@ def play(wav: str | Themes, wait: bool = True) -> None:
         song.add(song.QUARTER, 'A4', 'A3')
         song.add(song.QUARTER, 'A4', 'A3')
         song.play()
-    elif wav == Themes.CONTRA:
+    elif wav == Theme.CONTRA:
         song = Song(tempo=150)
         song.add(song.SIXTEENTH, 'F5')
         song.add(song.SIXTEENTH, 'Eb5')
@@ -228,5 +228,5 @@ def play(wav: str | Themes, wait: bool = True) -> None:
 
 
 def random() -> None:
-    """Play a random theme."""
-    play(choice(list(Themes.__members__.values())))
+    """Play a random :class:`.Theme`."""
+    play(choice(list(Theme.__members__.values())))
