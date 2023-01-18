@@ -40,6 +40,7 @@ from .equipment.base import devices
 from .equipment.base import widgets
 from .io import PhotonWriter
 from .log import logger
+from .log import set_level
 from .network import CreateClient
 from .network import StartEquipmentService
 from .network import StartManager
@@ -510,6 +511,23 @@ class App(QtCore.QObject):
 
         recipients = to if to else [name.text for name in element.findall('to')]
         send_email(config, recipients, sender=sender, subject=subject, body=body)
+
+    def set_logging_level(self, level: int | str, *names: str) -> None:
+        """Set the logging level for the specified loggers.
+
+        Args:
+            level: The logging level.
+            names: The names of the loggers to set to `level`. If none are
+                specified then defaults to the logger for this package.
+        """
+        if isinstance(level, str):
+            level = level.upper()
+
+        if not names:
+            names = [self.logger.name]
+
+        for name in names:
+            set_level(name, level)
 
     def start_equipment_service(self, alias: str, **kwargs) -> None:
         """Start a :class:`~msl.network.service.Service` that interfaces with equipment.
