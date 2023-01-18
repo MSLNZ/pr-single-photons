@@ -33,6 +33,7 @@ from msl.qt.convert import to_qfont
 from msl.qt.utils import drag_drop_paths
 from msl.qt.utils import screen_geometry
 
+from . import audio
 from .equipment.base import BaseEquipment
 from .equipment.base import BaseEquipmentWidget
 from .equipment.base import ConnectionClass
@@ -360,6 +361,23 @@ class App(QtCore.QObject):
     def logger(self):
         """The application logger."""
         return logger
+
+    @staticmethod
+    def play_sound(wav: str | audio.Theme = None, wait: bool = True) -> None:
+        """Play a WAV file or theme.
+
+        Args:
+            wav: The file or :class:`~.audio.Theme` to play. If not specified
+                then play a random :class:`~.audio.Theme`.
+            wait: Whether to wait for the WAV file to finish playing before
+                returning. Only used if `wav` is a file. Specifying a
+                :class:`~.audio.Theme` will always wait, since the audio data
+                is stored in memory.
+        """
+        if wav is None:
+            audio.random()
+        else:
+            audio.play(wav, wait=wait)
 
     @staticmethod
     def plot(data: str | Root | np.ndarray | list | tuple = None,
