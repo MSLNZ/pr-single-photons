@@ -383,12 +383,12 @@ class App(QtCore.QObject):
     def plot(data: str | Root | np.ndarray | list | tuple = None,
              block: bool = True,
              **kwargs) -> QtWidgets.QApplication:
-        """Show the Plot widget.
+        """Show the :class:`.Plot` widget.
 
         Args:
             data: The data to initially plot. If a string then a file path.
-                If not specified then an emtpy Plot is returned.
-            block: Whether to block until all Plots are closed.
+                If not specified then an emtpy :class:`.Plot` is returned.
+            block: Whether to block until all plots are closed.
             **kwargs: If `data` is a filename then all keyword arguments
                 are passed to :func:`~msl.io.read`. Otherwise, ignored.
 
