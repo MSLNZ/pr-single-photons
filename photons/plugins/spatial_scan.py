@@ -25,6 +25,7 @@ from msl.qt import prompt
 
 from .base import BasePlugin
 from .base import plugin
+from .. import audio
 from ..equipment import DMM
 from ..equipment.widgets import DAQCounterWidget
 from ..samples import Samples
@@ -321,6 +322,7 @@ class SpatialScan(BasePlugin):
         self.main.status_bar_message.emit(f'{self.windowTitle()} finished [took {hms}]')
         self.main.hide_progress_bar.emit()
         self.app.send_email(subject=f'{self.windowTitle()} finished', body=f'Took {hms}')
+        audio.random()
 
     @Slot()
     def on_worker_start(self) -> None:
