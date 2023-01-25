@@ -225,9 +225,16 @@ class Keysight3458A(DMM):
         """
         # must send each query individually
         def query(command):
-            return self.connection.query(command).rstrip()
+            return self.connection.query(command).strip()
 
-        function, range_ = query('FUNC?').split(',')
+        result = query('FUNC?').split(',')
+        if len(result) == 2:
+            # Sometimes get
+            #   ValueError: not enough values to unpack (expected 2, got 1)
+            function, range_ = result
+        else:
+            function, range_ = query('FUNC?').split(',')
+
         samples_per_trigger, event = query('NRDGS?').split(',')
         return {
             'auto_range': DMM.AUTO[query('ARANGE?')],
