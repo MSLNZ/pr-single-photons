@@ -92,7 +92,7 @@ class Keysight3458A(DMM):
 
         If there is an error then raise an exception.
         """
-        message = self.connection.query('ERRSTR?')
+        message = self.connection.query('ERRSTR?').lstrip()
         if not message.startswith('0,'):
             self.raise_exception(message)
 
