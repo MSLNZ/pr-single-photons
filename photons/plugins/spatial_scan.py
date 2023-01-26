@@ -391,6 +391,14 @@ class SpatialScanWorker(Worker):
         self.detector = parent.detector
         self.shutter = parent.shutter
 
+        self.detector_settings = {}
+        self.send_detector_bus_trigger = False
+        if self.is_detector_dmm:
+            self.detector_settings = self.detector.settings()
+            tm = self.detector_settings['trigger_mode']
+            self.send_detector_bus_trigger = (tm == 'BUS') or \
+                (tm == 'AUTO' and self.detector.record_to_json()['model'] == '3458A')
+
         if not parent.is_detector_dmm:
             widget = typing.cast(DAQCounterWidget, parent.detector_widget)
             self.count_edges_kwargs = {
@@ -407,9 +415,9 @@ class SpatialScanWorker(Worker):
             (monitor samples, detector samples)
         """
         self.monitor.bus_trigger()
-        if self.is_detector_dmm:
+        if self.send_detector_bus_trigger:
             self.detector.bus_trigger()
-        # read DUT before monitor since DUT could be a single-photon detector
+        # read DUT before monitor since DUT could be connected to a counter or the SIA from CMI
         dut = self.read_dut()
         mon = self.monitor.fetch()
         return mon, dut
@@ -455,7 +463,7 @@ class SpatialScanWorker(Worker):
             comment=self.plugin.comment,
             delay=self.delay,
             delay_unit='seconds',
-            detector_info=self.detector.settings() if self.is_detector_dmm else {},
+            detector_info=self.detector_settings,
             monitor_info=self.monitor.settings(),
             x_start=x_original,
             x_step=round(x_values[1] - x_values[0], 4) if len(x_values) > 1 else 0.0,
@@ -537,6 +545,6 @@ class SpatialScanWorker(Worker):
     def read_dut(self) -> Samples:
         """Read the samples for the device-under-test."""
         if self.is_detector_dmm:
-            return self.detector.fetch()
+            return self.detector.fetch(initiate=not self.send_detector_bus_trigger)
         else:
             return self.detector.count_edges(**self.count_edges_kwargs)
