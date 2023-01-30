@@ -306,11 +306,11 @@ class Samples:
             self._mean, self._std = math.nan, math.nan
 
     def __iter__(self):
-        return iter((self._mean, self._std))
+        return iter((self.mean, self.stdom))
 
     def __format__(self, format_spec) -> str:
         fmt = Format(**parse(format_spec))
-        fmt.update(self._std)
+        fmt.update(self.stdom)
         return fmt.result(_stylize(self._to_string(fmt), fmt))
 
     def __getattr__(self, item):
@@ -322,7 +322,7 @@ class Samples:
 
     def _to_string(self, fmt: Format) -> str:
         """Convert to a formatted string."""
-        x, u = self._mean, self._std
+        x, u = self.mean, self.stdom
         if u == 0:
             if fmt.si:
                 fmt.update(x)
@@ -412,7 +412,15 @@ class Samples:
         try:
             return 100.0 * (self._std / self._mean)
         except ZeroDivisionError:
-            return math.nan
+            return math.inf
+
+    @property
+    def relative_stdom(self) -> float:
+        """Returns the relative standard deviation of the mean."""
+        try:
+            return 100.0 * (self.stdom / self._mean)
+        except ZeroDivisionError:
+            return math.inf
 
     @property
     def samples(self) -> np.ndarray:
@@ -435,7 +443,7 @@ class Samples:
         try:
             return self._std / math.sqrt(self._size)
         except ZeroDivisionError:
-            return math.nan
+            return math.inf
 
     def to_json(self) -> dict[str, float]:
         """Allows for this class to be JSON serializable with msl-network."""
@@ -446,15 +454,13 @@ class Samples:
             'overload': self._overload
         }
 
-    def to_ureal(self, label: str = None, independent: bool = True) -> UncertainReal:
+    def to_ureal(self, label: str = None) -> UncertainReal:
         """Convert to an uncertain-real number."""
-        df = self._size - 1 if self._size > 0 else math.inf
-        return ureal(self._mean, self._std, df=df, label=label,
-                     independent=independent)
+        return ureal(self.mean, self.stdom, df=self._size-1, label=label, independent=True)
 
     @property
     def variance(self) -> float:
-        """Returns the variance."""
+        """Returns the sample variance."""
         return self._std * self._std
 
 
