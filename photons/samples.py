@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 import numpy as np
+from GTC import type_a
 from GTC import ureal
 from GTC.lib import UncertainReal
 
@@ -250,9 +251,9 @@ class Samples:
                  samples: str | Sequence[str | int | float] | np.ndarray = None,
                  *,
                  mean: float = None,
-                 std: float = None,
+                 stdev: float = None,
                  size: int = None,
-                 overload: float = 1e30) -> None:
+                 overload: float | None = 1e30) -> None:
         """Convenience class for a 1-D array of data samples.
 
         Calculates the mean, standard deviation, variance, relative standard
@@ -261,17 +262,17 @@ class Samples:
         Args:
             samples: The samples. If a string then in CSV format.
             mean: If specified, then it is not calculated from the `samples`.
-            std: If specified, then it is not calculated from the `samples`.
+            stdev: If specified, then it is not calculated from the `samples`.
             size: If specified, then it is not determined from the `samples`.
             overload: For some devices, like a DMM, if the input signal is greater
                 than the present range can measure, the device returns a large
                 value (e.g., 9.9E+37) to indicate a measurement overload. If the
                 absolute value of the mean is greater than `overload` then the
-                mean and standard deviation become NaN. Setting `overload` equal
-                to ``math.inf`` disables this check.
+                mean and standard deviation become NaN. Setting `overload` to
+                :data:`None` disables this check.
         """
-        if samples is not None and any(a is not None for a in (mean, std, size)):
-            raise ValueError('Cannot specify samples and the mean, std or size')
+        if samples is not None and any(a is not None for a in (mean, stdev, size)):
+            raise ValueError('Cannot specify samples and the mean, stdev or size')
 
         if isinstance(samples, str):
             stripped = samples.rstrip()
@@ -290,23 +291,16 @@ class Samples:
             raise ValueError('only 1D arrays are allowed')
 
         self._size = self._samples.size if size is None else size
+        self._overload = overload
+        self._stdev = stdev
 
-        if mean is None:
-            self._mean = float(np.mean(self._samples)) if self._size > 0 else math.nan
+        if mean is not None:
+            self._mean = self._check_overload(mean)
         else:
-            self._mean = mean
-
-        if std is None:
-            self._std = float(np.std(self._samples, ddof=1)) if self._size > 1 else math.nan
-        else:
-            self._std = std
-
-        self._overload = float(overload)
-        if math.isfinite(self._mean) and abs(self._mean) > overload:
-            self._mean, self._std = math.nan, math.nan
+            self._mean = None
 
     def __iter__(self):
-        return iter((self.mean, self.stdom))
+        return iter((self.mean, self.stdev))
 
     def __format__(self, format_spec) -> str:
         fmt = Format(**parse(format_spec))
@@ -318,7 +312,17 @@ class Samples:
         return getattr(self._samples, item)
 
     def __repr__(self) -> str:
-        return f'Samples(mean={self._mean}, std={self._std}, size={self._size})'
+        return f'Samples(mean={self.mean}, stdev={self.stdev}, size={self.size})'
+
+    def _check_overload(self, mean: float) -> float:
+        if self._overload is None:
+            return mean
+
+        if math.isfinite(mean) and abs(mean) > self._overload:
+            self._stdev = math.nan
+            return math.nan
+
+        return mean
 
     def _to_string(self, fmt: Format) -> str:
         """Convert to a formatted string."""
@@ -399,28 +403,33 @@ class Samples:
     @property
     def mean(self) -> float:
         """Returns the mean."""
+        if self._mean is not None:
+            return self._mean
+
+        mean = float(np.mean(self._samples)) if self._size > 0 else math.nan
+        self._mean = self._check_overload(mean)
         return self._mean
 
     @property
-    def overload(self) -> float:
+    def overload(self) -> float | None:
         """Returns the overload value."""
         return self._overload
 
     @property
-    def relative_std(self) -> float:
+    def relative_stdev(self) -> float:
         """Returns the relative standard deviation."""
         try:
-            return 100.0 * (self._std / self._mean)
+            return 100.0 * (self.stdev / self.mean)
         except ZeroDivisionError:
-            return math.inf
+            return math.nan
 
     @property
     def relative_stdom(self) -> float:
         """Returns the relative standard deviation of the mean."""
         try:
-            return 100.0 * (self.stdom / self._mean)
+            return 100.0 * (self.stdom / self.mean)
         except ZeroDivisionError:
-            return math.inf
+            return math.nan
 
     @property
     def samples(self) -> np.ndarray:
@@ -433,35 +442,61 @@ class Samples:
         return self._size
 
     @property
-    def std(self) -> float:
+    def stdev(self) -> float:
         """Returns the sample standard deviation."""
-        return self._std
+        if self._stdev is not None:
+            return self._stdev
+
+        self._stdev = float(np.std(self._samples, ddof=1)) if self._size > 1 else math.nan
+        return self._stdev
 
     @property
     def stdom(self) -> float:
         """Returns the standard deviation of the mean."""
         try:
-            return self._std / math.sqrt(self._size)
+            return self.stdev / math.sqrt(self._size)
         except ZeroDivisionError:
-            return math.inf
+            return math.nan
 
     def to_json(self) -> dict[str, float]:
         """Allows for this class to be JSON serializable with msl-network."""
         return {
-            'mean': self._mean,
-            'std': self._std,
+            'mean': self.mean,
+            'stdev': self.stdev,
             'size': self._size,
             'overload': self._overload
         }
 
-    def to_ureal(self, label: str = None) -> UncertainReal:
-        """Convert to an uncertain-real number."""
-        return ureal(self.mean, self.stdom, df=self._size-1, label=label, independent=True)
+    def to_ureal(self,
+                 *,
+                 label: str = None,
+                 delta: float = None,
+                 truncated: bool = False) -> UncertainReal:
+        """Convert to an uncertain-real number.
+
+        Args:
+            label: The label to associate with the uncertain number.
+            delta: The digitization step size (only valid if the samples are digitized).
+            truncated: Whether the digitized samples were truncated or rounded.
+                Only used if `delta` is not :data:`None`.
+
+        Returns:
+            The samples as an uncertain-real number.
+        """
+        if delta is not None:
+            return type_a.estimate_digitized(
+                self._samples, delta, label=label, truncate=truncated)
+
+        if self._samples.size > 0:
+            return type_a.estimate(self._samples, label=label)
+
+        return ureal(self.mean, self.stdom, df=self._size-1, label=label,
+                     independent=True)
 
     @property
     def variance(self) -> float:
         """Returns the sample variance."""
-        return self._std * self._std
+        return self.stdev * self.stdev
 
 
 def _round(value: float, fmt: Format, exponent: int = None) -> Rounded:

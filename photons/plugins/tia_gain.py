@@ -244,7 +244,7 @@ class TIAGainWorker(Worker):
 
             value, si_prefix = number_to_si(max_amps, unicode=False)
             name = f'{value:.0f} {si_prefix}A'
-            writer.initialize('set_current', 'current', 'current_std', 'voltage', 'voltage_std',
+            writer.initialize('set_current', 'current', 'current_stdev', 'voltage', 'voltage_stdev',
                               size=currents.size, name=name, **metadata)
 
             total = float(currents.size) * len(values)

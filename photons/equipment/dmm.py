@@ -237,5 +237,5 @@ class DMM(BaseEquipment):
         self.logger.info(f'fetch {self.alias!r} samples={samples!r}')
         s = Samples(samples)
         self.fetched.emit(s)
-        self.maybe_emit_notification(s.mean, s.std)
+        self.maybe_emit_notification(s.mean, s.stdev, s.size)
         return s

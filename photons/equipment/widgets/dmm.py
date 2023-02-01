@@ -157,8 +157,8 @@ class DMMWidget(BaseEquipmentWidget):
     def notification_handler(self, *args, **kwargs) -> None:
         """Handle a notification emitted by the DMM Service."""
         if args:
-            mean, std = args
-            self.on_fetched(Samples(mean=mean, std=std))
+            mean, stdev, size = args
+            self.on_fetched(Samples(mean=mean, stdev=stdev, size=size))
         else:
             self.update_tooltip(kwargs)
 

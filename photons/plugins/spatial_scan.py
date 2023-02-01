@@ -431,9 +431,9 @@ class SpatialScanWorker(Worker):
         mon, dut = self.acquire()
         return {
             'mon_ave': mon.mean,
-            'mon_std': mon.std,
+            'mon_stdev': mon.stdev,
             'dut_ave': dut.mean,
-            'dut_std': dut.std,
+            'dut_stdev': dut.stdev,
         }
 
     def process(self) -> None:
@@ -493,7 +493,7 @@ class SpatialScanWorker(Worker):
 
             iteration = 0
             writer.initialize(
-                'x', 'y', 'z', 'mon', 'mon_std', 'dut', 'dut_std',
+                'x', 'y', 'z', 'mon', 'mon_stdev', 'dut', 'dut_stdev',
                 name=f'spatial_scan_{irepeat+1}',
                 size=total,
                 dark_before=self.acquire_dark(),
@@ -531,7 +531,7 @@ class SpatialScanWorker(Worker):
                         self.logger.info(f'waiting for {self.delay} seconds ...')
                         QtCore.QThread.msleep(self.delay_ms)
                         mon, dut = self.acquire()
-                        writer.append(x, y, z, mon.mean, mon.std, dut.mean, dut.std)
+                        writer.append(x, y, z, mon.mean, mon.stdev, dut.mean, dut.stdev)
                         iteration += 1
                         self.update_progress_bar.emit(100 * iteration / total)
 
