@@ -218,12 +218,12 @@ class TIAGainWorker(Worker):
                 decimals=decimals
             )
 
-            # The Keithley 6430 is a bit slower to read the output current than the DMM is,
-            # so read less samples than the DMM does so that each device acquires
-            # samples during approximately the same time interval
             dmm_settings = dmm.configure(nsamples=10, range=dmm_range)
 
             femto.disable_output()
+            # The Keithley 6430 is a bit slower to read the output current than the DMM is,
+            # so read less samples than the DMM does so that each device acquires
+            # samples during approximately the same time interval
             femto_settings = femto.configure_source(nsamples=6, range=max_amps, cmpl=0.1)
             femto.enable_output()
 
