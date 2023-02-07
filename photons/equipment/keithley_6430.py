@@ -289,7 +289,7 @@ class Keithley6430(DMM):
               'trigger_mode': str
             }
         """
-        function = DMM.FUNCTIONS[self.connection.query(':SENSE:FUNCTION?')]
+        function = DMM.FUNCTIONS[self.connection.query(':SENSE:FUNCTION?').rstrip()]
         command = f':SENSE:{function}:NPLC?;PROTECTION?;RANGE?;RANGE:AUTO?;' \
                   f':SYSTEM:AZERO?;' \
                   f':ARM:SOURCE?;' \
@@ -327,7 +327,7 @@ class Keithley6430(DMM):
               'trigger_mode': str
             }
         """
-        function = DMM.FUNCTIONS[self.connection.query(':SOURCE:FUNCTION?')]
+        function = DMM.FUNCTIONS[self.connection.query(':SOURCE:FUNCTION?').rstrip()]
         sense_function = 'CURRENT' if function == 'VOLTAGE' else 'VOLTAGE'
         command = f':SOURCE:{function}:MODE?;RANGE?;' \
                   f':SENSE:{sense_function}:RANGE?;PROTECTION?;' \
