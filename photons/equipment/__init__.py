@@ -12,6 +12,7 @@ from .hrs_monochromator import HRSMonochromator
 from .keithley_6430 import Keithley6430
 from .laser_superk import SuperK
 from .nidaq import NIDAQ
+from .oscilloscope_rigol import RigolOscilloscope
 from .shot702_controller import OptoSigmaSHOT702
 from .shutter import Shutter
 from .shutter_ksc101 import KSC101Shutter
