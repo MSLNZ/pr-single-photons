@@ -39,9 +39,32 @@ class SIA3CMI(BaseEquipment):
         self._integration_time: SIA3.IntegrationTime | None = None
         self.set_integration_time(self.Integration.TIME_1m)
 
-    def get_integration_time(self) -> SIA3.GAIN:
-        """Returns the integration time (i.e., the gain)."""
-        return self._integration_time
+        self._numeric = {
+            SIA3.GAIN.TIME_50u: 50e-6,
+            SIA3.GAIN.TIME_100u: 100e-6,
+            SIA3.GAIN.TIME_1m: 1e-3,
+            SIA3.GAIN.TIME_10m: 10e-3,
+            SIA3.GAIN.TIME_20m: 20e-3,
+            SIA3.GAIN.TIME_100m: 100e-3,
+            SIA3.GAIN.TIME_200m: 200e-3,
+            SIA3.GAIN.TIME_500m: 500e-3,
+            SIA3.GAIN.TIME_1: 1.0,
+            SIA3.GAIN.TIME_2: 2.0,
+        }
+
+    def get_integration_time(self, as_enum: bool = False) -> SIA3.GAIN | float:
+        """Get the integration time.
+
+        Args:
+            as_enum: Whether to return the value as an :class:`SIA3.GAIN` enum
+                value or as a numeric value in seconds.
+
+        Returns:
+            The integration time.
+        """
+        if as_enum:
+            return self._integration_time
+        return self._numeric[self._integration_time]
 
     def set_integration_time(self, time: int | str) -> None:
         """Set the integration time (i.e., the gain).

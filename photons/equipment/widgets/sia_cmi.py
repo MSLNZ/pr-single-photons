@@ -33,20 +33,20 @@ class SIA3CMIWidget(BaseEquipmentWidget):
         super().__init__(connection, parent=parent)
 
         index = None
-        int_time = connection.get_integration_time()
+        int_time = connection.get_integration_time(as_enum=True)
         items = {}
-        for i, (key, value) in enumerate(SIA3CMI.Integration.__members__.items()):
-            if value == int_time:
+        for i, enum in enumerate(SIA3CMI.Integration):
+            if enum.value == int_time:
                 index = i
 
-            d = _gain_regex.search(key).groupdict()
+            d = _gain_regex.search(enum.name).groupdict()
             if not d['unit']:
                 text = f'{d["value"]} s'
             elif d['unit'] == 'u':
                 text = f'{d["value"]} {MICRO}s'
             else:
                 text = f'{d["value"]} {d["unit"]}s'
-            items[text] = value
+            items[text] = enum.value
 
         if index is None:
             raise ValueError(f'Cannot determine the QComboBox index for '
