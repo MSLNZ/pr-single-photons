@@ -555,7 +555,7 @@ class App(QtCore.QObject):
         Args:
             duration: The number of seconds to sleep.
         """
-        logger.debug(f'sleep for {duration} second(s)')
+        logger.info(f'sleep for {duration} second(s)')
         time.sleep(duration)
 
     def start_equipment_service(self, alias: str, **kwargs) -> None:
