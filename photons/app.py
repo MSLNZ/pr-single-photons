@@ -4,6 +4,7 @@ Main application entry point and GUI.
 import os
 import re
 import sys
+import time
 from datetime import datetime
 from functools import partial
 from typing import cast
@@ -546,6 +547,16 @@ class App(QtCore.QObject):
 
         for name in names:
             set_level(name, level)
+
+    @staticmethod
+    def sleep(duration: float) -> None:
+        """Suspend execution of the calling thread for the given number of seconds.
+
+        Args:
+            duration: The number of seconds to sleep.
+        """
+        logger.debug(f'sleep for {duration} second(s)')
+        time.sleep(duration)
 
     def start_equipment_service(self, alias: str, **kwargs) -> None:
         """Start a :class:`~msl.network.service.Service` that interfaces with equipment.
