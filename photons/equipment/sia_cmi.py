@@ -73,6 +73,7 @@ class SIA3CMI(BaseEquipment):
 
             time=sia.Integration.TIME_100u
             time='100u'
+            time='100us'
             time=6
 
         are all equivalent.
@@ -80,6 +81,8 @@ class SIA3CMI(BaseEquipment):
         Args:
             time: The integration time.
         """
+        if isinstance(time, str):
+            time = time.rstrip('s')
         self._integration_time = self.connection.convert_to_enum(
             time, self.Integration, prefix='TIME_')
 
