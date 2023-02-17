@@ -56,8 +56,9 @@ class SIA3CMI(BaseEquipment):
         """Get the integration time.
 
         Args:
-            as_enum: Whether to return the value as an :class:`SIA3.GAIN` enum
-                value or as a numeric value in seconds.
+            as_enum: Whether to return the value as an
+                :class:`~msl.equipment.resources.cmi.sia3.IntegrationTime`
+                enum value or as a numeric value in seconds.
 
         Returns:
             The integration time.
