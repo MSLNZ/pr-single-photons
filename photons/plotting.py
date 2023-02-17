@@ -422,8 +422,11 @@ class ScatterPlot(QtWidgets.QWidget):
         else:
             self._plot_widget.setAxisItems({'bottom': pg.AxisItem(orientation='bottom')})  # reset
 
-        x *= self._x_scaling.value()
-        y *= self._y_scaling.value()
+        # Do not use "x *= " and "y *= " to avoid getting an error like:
+        #   Cannot cast ufunc 'multiply' output from dtype('float64') to
+        #   dtype('uint64') with casting rule 'same_kind'
+        x = x * self._x_scaling.value()
+        y = y * self._y_scaling.value()
 
         if self._y_range_checkbox.isChecked():
             indices = np.logical_and(self._y_minimum.value() <= y,
