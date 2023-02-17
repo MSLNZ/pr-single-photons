@@ -34,6 +34,8 @@ Submodules
    photons.equipment.kinesis
    photons.equipment.laser_superk
    photons.equipment.nidaq
+   photons.equipment.oscilloscope
+   photons.equipment.oscilloscope_rigol
    photons.equipment.shot702_controller
    photons.equipment.shutter
    photons.equipment.shutter_ksc101
