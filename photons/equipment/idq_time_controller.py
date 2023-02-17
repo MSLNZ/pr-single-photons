@@ -68,11 +68,19 @@ class DelaySettings:
     address: str
     value: float
 
+    def to_json(self) -> dict[str, str | float]:
+        """Return the settings as a JSON serializable object."""
+        return {'address': self.address, 'value': self.value}
+
 
 @dataclass
 class DeviceSettings:
     clock: Clock
     mode: Mode
+
+    def to_json(self) -> dict[str, str]:
+        """Return the settings as a JSON serializable object."""
+        return {'clock': self.clock.value, 'mode': self.mode.value}
 
 
 @dataclass
@@ -81,6 +89,15 @@ class Histogram:
     hist2: np.ndarray
     hist3: np.ndarray
     hist4: np.ndarray
+
+    def to_json(self) -> dict[str, list]:
+        """Return the histogram data as a JSON serializable object."""
+        return {  # noqa:  tolist() returns a list
+            'hist1': self.hist1.tolist(),
+            'hist2': self.hist2.tolist(),
+            'hist3': self.hist3.tolist(),
+            'hist4': self.hist4.tolist(),
+        }
 
 
 @dataclass
@@ -93,6 +110,19 @@ class HistogramSettings:
     maximum: float
     bin_count: int
     bin_width: float
+
+    def to_json(self) -> dict[str, str | int | float]:
+        """Return the settings as a JSON serializable object."""
+        return {
+            'channel': self.channel,
+            'ref': self.ref,
+            'stop': self.stop,
+            'enabler': self.enabler,
+            'minimum': self.minimum,
+            'maximum': self.maximum,
+            'bin_count': self.bin_count,
+            'bin_width': self.bin_width
+        }
 
 
 @dataclass
@@ -108,6 +138,21 @@ class InputSettings:
     select: Select
     threshold: float
 
+    def to_json(self) -> dict[str, str | bool | int | float]:
+        """Return the settings as a JSON serializable object."""
+        return {
+            'channel': self.channel,
+            'coupling': self.coupling.value,
+            'edge': self.edge.value,
+            'enabled': self.enabled,
+            'delay': self.delay,
+            'duration': self.duration,
+            'mode': self.mode.value,
+            'resync_policy': self.resync_policy.value,
+            'select': self.select.value,
+            'threshold': self.threshold
+        }
+
 
 @dataclass
 class StartSettings:
@@ -119,6 +164,19 @@ class StartSettings:
     mode: Mode
     select: Select
     threshold: float
+
+    def to_json(self) -> dict[str, str | bool | float]:
+        """Return the settings as a JSON serializable object."""
+        return {
+            'coupling': self.coupling.value,
+            'edge': self.edge.value,
+            'enabled': self.enabled,
+            'delay': self.delay,
+            'duration': self.duration,
+            'mode': self.mode.value,
+            'select': self.select.value,
+            'threshold': self.threshold
+        }
 
 
 @equipment(manufacturer=r'ID\s*Q', model=r'ID900')
