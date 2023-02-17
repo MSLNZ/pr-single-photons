@@ -30,6 +30,7 @@ Submodules
    photons.equipment.highfinesse
    photons.equipment.highfinesse_sdk
    photons.equipment.hrs_monochromator
+   photons.equipment.idq_time_controller
    photons.equipment.keithley_6430
    photons.equipment.kinesis
    photons.equipment.laser_superk

@@ -9,6 +9,7 @@ from .dmm_344xxA import Keysight344XXA
 from .dmm_3458A import Keysight3458A
 from .highfinesse import HighFinesse
 from .hrs_monochromator import HRSMonochromator
+from .idq_time_controller import IDQTimeController
 from .keithley_6430 import Keithley6430
 from .laser_superk import SuperK
 from .nidaq import NIDAQ
