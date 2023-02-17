@@ -397,9 +397,17 @@ class IDQTimeController(BaseEquipment):
         """
         self._check_channel(channel)
 
-        if bin_width < 100e-12 or bin_width > 1e-3:
+        s = self.settings_device()
+        if s.mode == Mode.HIGH_RESOLUTION:
+            min_width = 13e-12
+            min_width_text = '13 ps'
+        else:
+            min_width = 100e-12
+            min_width_text = '100 ps'
+
+        if bin_width < min_width or bin_width > 1e-3:
             self.raise_exception(f'The bin width must be between '
-                                 f'100 ps and 1 ms (got {bin_width})')
+                                 f'{min_width_text} and 1 ms (got {bin_width})')
 
         if minimum < 0:
             self.raise_exception(f'The minimum time must be >0 (got {minimum})')
