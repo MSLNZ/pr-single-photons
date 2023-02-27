@@ -111,7 +111,7 @@ class OptoSigmaSHOT702(BaseEquipment):
     def home(self,
              *,
              wait: bool = True,
-             timeout: float = 30) -> None:
+             timeout: float = 300) -> None:
         """Home the continuously-variable filter wheel.
 
         Args:
@@ -149,7 +149,7 @@ class OptoSigmaSHOT702(BaseEquipment):
                   degrees: float,
                   *,
                   wait: bool = True,
-                  timeout: float = 30) -> None:
+                  timeout: float = 300) -> None:
         """Set the angle of the continuously-variable filter wheel.
 
         Args:
