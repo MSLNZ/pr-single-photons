@@ -143,6 +143,7 @@ class PhotonWriter(JSONWriter):
         self._arrays[name] = np.empty((size,), dtype=np.dtype(
             [('timestamp', type_timestamp)] + types_header  # noqa: Mixing datatypes str and float
         ))
+        logger.debug(f'initialized a {name!r} dataset')
 
     def meta(self, name: str = None) -> dict:
         """Return the current metadata of a dataset.
