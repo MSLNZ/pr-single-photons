@@ -8,6 +8,8 @@ import numpy as np
 import requests
 from numpy.lib import recfunctions
 
+from .log import logger
+
 
 def array_central(
         centre: float,
@@ -217,20 +219,29 @@ def lab_logging(root_url: str,
 
     try:
         reply = requests.get(f'{url}/now/?', params=params, timeout=timeout)
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
         if strict:
             raise
+        logger.error(str(e))
         return {}
 
     if not reply.ok:
-        raise RuntimeError(reply.content.decode())
+        msg = reply.content.decode()
+        if strict:
+            raise RuntimeError(msg)
+        logger.error(msg)
+        return {}
 
     data = reply.json()
     for key, value in data.items():
         if value['error']:
             error = value['error']
             alias = value['alias']
-            raise RuntimeError(f'{error} [Serial:{key}, Alias:{alias}]')
+            msg = f'{error} [Serial:{key}, Alias:{alias}]'
+            if strict:
+                raise RuntimeError(msg)
+            logger.error(msg)
+            return {}
 
     return data
 
