@@ -25,14 +25,36 @@ def test_write_read():
     w = io.PhotonWriter(file, log_size=10)
     w.initialize('a', 'b', 'c')
     w.append(1, 2, 3)
+    assert np.array_equal(w.data()['a'], [1])
+    assert np.array_equal(w.data()['b'], [2])
+    assert np.array_equal(w.data(name='dataset')['c'], [3])
     w.append(4, 5, 6)
     w.append(7, 8, 9)
+    assert np.array_equal(w.data()['a'], [1, 4, 7])
+    assert np.array_equal(w.data(name='dataset')['b'], [2, 5, 8])
+    assert np.array_equal(w.data()['c'], [3, 6, 9])
+    assert len(w.meta()) == 0
     w.initialize('x', 'y', name='hi', fruit='apple', types=[int, int])
     w.append(-1, 2)
+    assert np.array_equal(w.data(name='dataset')['a'], [1, 4, 7])
+    assert np.array_equal(w.data()['x'], [-1])
+    assert np.array_equal(w.data(name='hi')['y'], [2])
+    assert w.meta(name='dataset') == {}
+    assert w.meta() == {'fruit': 'apple'}
+    assert w.meta(name='hi') == {'fruit': 'apple'}
     w.initialize('foo', 'bar', name='/foo/bar/baz', microseconds=True, types=[float, int])
     w.update_metadata(name='hi', taste='sweat', colour='red')
     w.append(9.9, 8)
+    assert np.array_equal(w.data()['foo'], [9.9])
+    assert np.array_equal(w.data(name='/foo/bar/baz')['bar'], [8])
+    assert w.meta() == {}
+    assert w.meta(name='hi') == {'fruit': 'apple', 'taste': 'sweat', 'colour': 'red'}
     w.append(3, -4, name='hi')
+    assert np.array_equal(w.data(name='dataset')['b'], [2, 5, 8])
+    assert np.array_equal(w.data(name='hi')['y'], [2, -4])
+    assert np.array_equal(w.data(name='/foo/bar/baz')['foo'], [9.9])
+    assert np.array_equal(w.data()['bar'], [8])
+    assert w.meta(name='/foo/bar/baz') == {}
     w.write()
 
     root = read(w.file)
@@ -81,3 +103,7 @@ def test_not_initialized():
         w.append(1)
     with pytest.raises(ValueError, match=r'has not been initialized'):
         w.update_metadata(one=1)
+    with pytest.raises(ValueError, match=r'has not been initialized'):
+        w.data()
+    with pytest.raises(ValueError, match=r'has not been initialized'):
+        w.meta()

@@ -91,6 +91,18 @@ class PhotonWriter(JSONWriter):
         self._indices[key] += 1
         logger.debug(f'appended {row} to {key!r}')
 
+    def data(self, name: str = None) -> np.ndarray:
+        """Return the current data of a dataset.
+
+        Args:
+            name: The name of the dataset. If not specified then uses the name
+                of the latest dataset that was initialized.
+        """
+        key = name or self._name
+        if key not in self._arrays:
+            raise ValueError(f'A dataset with name {key!r} has not been initialized')
+        return self._arrays[key][:self._indices[key]]
+
     def initialize(self,
                    *header: str,
                    microseconds: bool = False,
@@ -131,6 +143,18 @@ class PhotonWriter(JSONWriter):
         self._arrays[name] = np.empty((size,), dtype=np.dtype(
             [('timestamp', type_timestamp)] + types_header  # noqa: Mixing datatypes str and float
         ))
+
+    def meta(self, name: str = None) -> dict:
+        """Return the current metadata of a dataset.
+
+        Args:
+            name: The name of the dataset. If not specified then uses the name
+                of the latest dataset that was initialized.
+        """
+        key = name or self._name
+        if key not in self._meta:
+            raise ValueError(f'A dataset with name {key!r} has not been initialized')
+        return self._meta[key]
 
     @staticmethod
     def now_iso(ignore_microsecond: bool = True) -> str:
