@@ -24,6 +24,7 @@ def device(aliases: str | tuple[str, ...], message: str) -> tuple[App, Connectio
     try:
         devs = app.connect_equipment(*aliases)
     except Exception as e:
+        print(e)
         app.prompt.critical(e)
         sys.exit()
 
