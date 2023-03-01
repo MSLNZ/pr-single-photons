@@ -112,7 +112,13 @@ class WLMData32(Server32):
             ('SetWideMode', c_long, (c_ushort,)),
         ]
         for name, res, args in signatures:
-            fcn = getattr(self.lib, name)
+            try:
+                fcn = getattr(self.lib, name)
+            except AttributeError:
+                # Some DLL's have different functions, for example,
+                # GetLinewidthMode might not be in wlmData.dll if the
+                # device does not support measuring the linewidth
+                continue
             fcn.argtypes = args
             fcn.restype = res
 
