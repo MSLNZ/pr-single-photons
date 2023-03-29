@@ -54,9 +54,6 @@ class BaseEquipment(QtCore.QObject, Service):
         self.running_as_service: bool = False
         self.connection: Connection = record.connect()
 
-        # redirect QtCore.QObject.disconnect
-        self.disconnect = self.connection.disconnect
-
     def __getattr__(self, item) -> Any:
         """Pass all attributes that do not exist to the connection object."""
         return getattr(self.connection, item)
@@ -73,6 +70,11 @@ class BaseEquipment(QtCore.QObject, Service):
         """See :func:`~msl.equipment.utils.convert_to_enum` for more details."""
         return convert_to_enum(
             obj, enum, prefix=prefix, to_upper=to_upper, strict=True)
+
+    def disconnect_equipment(self) -> None:
+        """Disconnect from the equipment and log an INFO message."""
+        self.connection.disconnect()
+        logger.info(f'disconnected from {self.alias!r}')
 
     @property
     def logger(self):

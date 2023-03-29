@@ -276,8 +276,7 @@ class App(QtCore.QObject):
                 self.connections[arg].unlink()
                 logger.info(f'unlinked from {arg!r}')
             else:
-                self.connections[arg].disconnect()
-                logger.info(f'disconnected from {arg!r}')
+                self.connections[arg].disconnect_equipment()
 
             del self.connections[arg]
             self.removed_connection.emit(arg)

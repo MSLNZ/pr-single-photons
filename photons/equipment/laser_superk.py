@@ -122,8 +122,6 @@ class SuperK(BaseEquipment):
             self.raise_exception(f'SuperK serial number mismatch, '
                                  f'{serial} != {record.serial}')
 
-        self.disconnect = self._disconnect
-
         # different SuperK's have different mainboard registry values
         self.MODULE_TYPE = self.connection.device_get_type(SuperK.DEVICE_ID)
         if self.MODULE_TYPE == SuperK.MODULE_TYPE_0x60:
@@ -413,11 +411,11 @@ class SuperK(BaseEquipment):
         self.logger.info(f'set the {self.alias!r} front-panel text to {text!r}')
         return self.connection.register_write_read_ascii(SuperK.DEVICE_ID, self.ID.USER_TEXT, text, False)
 
-    def _disconnect(self):
+    def disconnect_equipment(self):
         """Unlock the front panel, set the user text to an empty string and close the port."""
         self.lock_front_panel(False)
         self.set_user_text('')
-        self.connection.disconnect()
+        super().disconnect_equipment()
 
     def _set_current_level(self, percentage: float) -> float:
         if percentage < 0 or percentage > 100:

@@ -55,7 +55,6 @@ class Keithley6430(DMM):
         self._output_function: str = ''
         self._output_level: float | None = None
         self._output_range: float = 9e9
-        self.disconnect = self._disconnect
 
     def check_errors(self) -> None:
         """Query the error queue of the SourceMeter.
@@ -348,10 +347,10 @@ class Keithley6430(DMM):
             'trigger_mode': Keithley6430.TRIGGERS[arm]
         }
 
-    def _disconnect(self) -> None:
+    def disconnect_equipment(self) -> None:
         """Turn the output off and disconnect."""
         self.disable_output()
-        self.connection.disconnect()
+        super().disconnect_equipment()
 
     def _set_output_state(self, state: bool) -> None:
         """Turn the output on or off."""

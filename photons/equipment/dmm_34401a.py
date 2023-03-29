@@ -62,7 +62,6 @@ class HP34401A(DMM):
         self._rs232: bool = isinstance(self.connection, ConnectionSerial)
         if self._rs232:
             self.remote_mode()
-        self.disconnect = self._disconnect
 
     def bus_trigger(self) -> None:
         """Send a software trigger to the digital multimeter."""
@@ -219,8 +218,8 @@ class HP34401A(DMM):
             'trigger_mode': DMM.TRIGGERS[d2['TRIGGER_SOURCE']],
         }
 
-    def _disconnect(self) -> None:
+    def disconnect_equipment(self) -> None:
         """Set the digital multimeter to be in LOCAL mode and then close the connection."""
         if self._rs232:
             self.local_mode()
-        self.connection.disconnect()
+        super().disconnect_equipment()
