@@ -219,6 +219,7 @@ intersphinx_mapping = {
     'msl.network': ('https://msl-network.readthedocs.io/en/latest/', None),
     'msl.qt': ('https://msl-qt.readthedocs.io/en/latest/', None),
     'PySide6': ('', 'PySide6-aliases.inv'),
+    'pyqtgraph': ('https://pyqtgraph.readthedocs.io/en/latest/', None),
     'python': ('https://docs.python.org/3', None),
 }
 

@@ -3,6 +3,8 @@ Plot widget.
 """
 import os
 from datetime import datetime
+from math import isfinite
+from time import monotonic
 from typing import Callable
 from typing import Sequence
 
@@ -20,10 +22,13 @@ from msl.qt import Qt
 from msl.qt import QtCore
 from msl.qt import QtGui
 from msl.qt import QtWidgets
+from msl.qt import Signal
 from msl.qt import Slot
 from msl.qt import convert
 from msl.qt import prompt
 from msl.qt import utils
+
+from .samples import Samples
 
 
 class BaseTable(QtWidgets.QTableWidget):
@@ -483,6 +488,120 @@ class ScatterPlot(QtWidgets.QWidget):
         self._x_combobox.blockSignals(x_previous)
         self._y_combobox.blockSignals(y_previous)
         self.redraw()
+
+
+class RealTimePlot(QtWidgets.QWidget):
+
+    closing: QtCore.SignalInstance = Signal()
+    """Emitted when the widget closes."""
+
+    def __init__(self,
+                 *,
+                 error_options: dict = None,
+                 plot_options: dict = None,
+                 signaler: QtCore.SignalInstance = None,
+                 size: int = 10000,
+                 title: str = None) -> None:
+        """Plot data in real time.
+
+        Args:
+            error_options: Options passed to :class:`~pyqtgraph.ErrorBarItem`.
+                If not specified, default options are used.
+            plot_options: Options passed to :class:`~pyqtgraph.PlotItem`.
+                If not specified, default options are used.
+            signaler: The Qt signal that emits :class:`~photons.samples.Samples`.
+            size: The maximum number of data points that can be shown. When the
+                number of data points exceeds this value the latest data point
+                is shown and the oldest data point is removed.
+            title: The text to display in the titlebar of the widget.
+        """
+        super().__init__()
+        self._signaler = signaler
+        if signaler is not None:
+            signaler.connect(self.update)
+
+        if not error_options:
+            error_options = {'beam': 0.5, 'pen': pg.mkPen(color='#bdb76b', width=2)}
+
+        if not plot_options:
+            plot_options = {'symbol': 'o', 'pen': pg.mkPen(color=0.8, width=2)}
+
+        self._index = -1
+        self._x0 = monotonic()
+        self._x = np.empty(size)
+        self._y = np.empty(size)
+        self._dy = np.empty(size)
+
+        self._widget = pg.PlotWidget(self)
+        self._error = pg.ErrorBarItem(**error_options)
+        self._plot = self._widget.plot(**plot_options)
+        self._widget.addItem(self._error)
+        self._widget.setLabel('bottom', 'Time [s]')
+
+        layout = QtWidgets.QHBoxLayout()
+        layout.addWidget(self._widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(layout)
+        self.resize(300, 300)
+        self.setWindowTitle(title or self.__class__.__name__)
+
+    def clear(self) -> None:
+        """Clear the plot."""
+        self._index = -1
+        self._x0 = monotonic()
+        self._x[:] = 0
+        self._y[:] = 0
+        self._dy[:] = 0
+        empty = np.empty(0)
+        self._plot.setData(x=empty, y=empty)
+        self._error.setData(x=empty, y=empty, top=empty, bottom=empty)
+        self._error.setVisible(False)
+
+    @Slot(Samples)
+    def update(self, samples: Samples) -> None:
+        """Update the plot.
+
+        If a `signaler` is specified when this class is instantiated, this method
+        `(slot)` is called automatically when the `signaler` emits the `samples`.
+
+        Args:
+            samples: The data to add to the plot. The standard deviation of the
+                mean is used as the error bar.
+        """
+        self._index += 1
+        if self._index == self._x.size:
+            self._x = np.roll(self._x, -1)
+            self._y = np.roll(self._y, -1)
+            self._dy = np.roll(self._dy, -1)
+            self._index -= 1
+
+        i = self._index
+        self._x[i] = monotonic() - self._x0
+        self._y[i] = samples.mean
+        self._dy[i] = samples.stdom
+
+        i += 1
+        x = self._x[:i]
+        y = self._y[:i]
+        dy = self._dy[:i]
+
+        # need at least 2 data points to connect the points with a line
+        if i > 1:
+            self._plot.setData(x=x, y=y)
+            if isfinite(samples.stdom):
+                self._error.setData(x=x, y=y, top=dy, bottom=dy)
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        """Overrides :meth:`QtWidgets.QWidget.closeEvent`.
+
+        Disconnect from the `signaler` (if one was specified), removes items
+        from the plot and emits the :attr:`.closing` signal.
+        """
+        if self._signaler is not None:
+            self._signaler.disconnect(self.update)
+        self._widget.close()
+        self.closing.emit()
+        super().closeEvent(event)
 
 
 plots: list[Plot] = []

@@ -20,6 +20,7 @@ from msl.qt.convert import number_to_si
 from ..base import BaseEquipmentWidget
 from ..base import widget
 from ..dmm import DMM
+from ...plotting import RealTimePlot
 from ...samples import Samples
 
 
@@ -75,6 +76,13 @@ class DMMWidget(BaseEquipmentWidget):
             tooltip='Edit the configuration'
         )
 
+        self._plot = None
+        self.plot_button = Button(
+            icon='imageres|144',
+            left_click=self.on_show_plot,
+            tooltip='Plot the data. Re-clicking clears the plot.'
+        )
+
         self.live_spinbox = SpinBox(
             minimum=0,
             maximum=99999,
@@ -91,6 +99,7 @@ class DMMWidget(BaseEquipmentWidget):
 
         box = QtWidgets.QHBoxLayout()
         box.addWidget(self.config_button)
+        box.addWidget(self.plot_button)
         box.addSpacerItem(QtWidgets.QSpacerItem(
             1, 1, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum))
         box.addWidget(self.live_spinbox)
@@ -143,6 +152,25 @@ class DMMWidget(BaseEquipmentWidget):
             self.timer.stop()
             self.timer.start(msec)
 
+    @Slot()
+    def on_show_plot(self) -> None:
+        """Show the RealTimePlot widget."""
+        if self._plot is not None:
+            self._plot.close()
+
+        if self.connected_as_link:
+            signaler = None
+        else:
+            signaler = self.connection.fetched
+
+        self._plot = RealTimePlot(signaler=signaler, title=self.record.alias)
+        self._plot.show()
+        self._plot.closing.connect(self._plot_closing)
+
+    def _plot_closing(self) -> None:
+        """The plot widget is closing."""
+        self._plot = None
+
     @Slot(dict)
     def on_settings_changed(self, settings: dict) -> None:
         """Slot for the connection.config_changed signal."""
@@ -158,7 +186,10 @@ class DMMWidget(BaseEquipmentWidget):
         """Handle a notification emitted by the DMM Service."""
         if args:
             mean, stdev, size = args
-            self.on_fetched(Samples(mean=mean, stdev=stdev, size=size))
+            s = Samples(mean=mean, stdev=stdev, size=size)
+            self.on_fetched(s)
+            if self._plot is not None:
+                self._plot.update(s)
         else:
             self.update_tooltip(kwargs)
 
@@ -206,6 +237,8 @@ class DMMWidget(BaseEquipmentWidget):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         """Override :meth:`QtWidgets.QWidget.closeEvent` to stop the QTimer and QThread."""
         self.stop_timer_and_thread()
+        if self._plot is not None:
+            self._plot.close()
         super().closeEvent(event)
 
 
