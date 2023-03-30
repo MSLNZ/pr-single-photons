@@ -55,6 +55,8 @@ class DMMWidget(BaseEquipmentWidget):
         """
         super().__init__(connection, parent=parent)
 
+        self._samples: Samples = Samples()
+
         self.settings: dict[str, ...] = {}  # gets updated in update_tooltip()
         self.unit_map: dict[str, str] = {
             'CURRENT': 'A',
@@ -83,12 +85,12 @@ class DMMWidget(BaseEquipmentWidget):
             tooltip='Plot the data. Re-clicking clears the plot.'
         )
 
-        self.live_spinbox = SpinBox(
-            minimum=0,
-            maximum=99999,
-            value=0,
-            tooltip='The number of milliseconds to wait between live updates',
-            value_changed=self.on_live_spinbox_changed,
+        self.digits_spinbox = SpinBox(
+            minimum=1,
+            maximum=9,
+            value=2,
+            tooltip='The number of digits in the uncertainty to retain',
+            value_changed=self.on_digits_spinbox_changed,
         )
 
         self.live_checkbox = CheckBox(
@@ -102,7 +104,7 @@ class DMMWidget(BaseEquipmentWidget):
         box.addWidget(self.plot_button)
         box.addSpacerItem(QtWidgets.QSpacerItem(
             1, 1, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum))
-        box.addWidget(self.live_spinbox)
+        box.addWidget(self.digits_spinbox)
         box.addWidget(self.live_checkbox)
 
         layout = QtWidgets.QVBoxLayout()
@@ -118,7 +120,12 @@ class DMMWidget(BaseEquipmentWidget):
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.on_timer_timeout)  # noqa: QTimer.timeout exists
-        self.timer.start(self.live_spinbox.value())
+        self.timer.start()
+
+    @Slot(int)
+    def on_digits_spinbox_changed(self, value: int) -> None:  # noqa: Parameter 'value' is not used
+        """Change the number of digits in the uncertainty to retain."""
+        self.on_fetched(self._samples)
 
     @Slot()
     def on_edit_configuration(self) -> None:
@@ -134,23 +141,18 @@ class DMMWidget(BaseEquipmentWidget):
     @Slot(Samples)
     def on_fetched(self, samples: Samples) -> None:
         """Samples were fetched."""
+        self._samples = samples
+        d = self.digits_spinbox.value()
         unit = self.unit_map[self.settings['function']]
-        self.value_lineedit.setText(f'{samples:.4S} {unit}')
+        self.value_lineedit.setText(f'{samples:.{d}S} {unit}')
 
     @Slot(bool)
     def on_live_checkbox_changed(self, checked: bool) -> None:
         """Start or stop the QTimer."""
         if checked:
-            self.timer.start(self.live_spinbox.value())
+            self.timer.start()
         else:
             self.timer.stop()
-
-    @Slot(int)
-    def on_live_spinbox_changed(self, msec: int) -> None:
-        """Change the timeout interval of the QTimer."""
-        if self.live_checkbox.isChecked():
-            self.timer.stop()
-            self.timer.start(msec)
 
     @Slot()
     def on_show_plot(self) -> None:
@@ -197,7 +199,7 @@ class DMMWidget(BaseEquipmentWidget):
         """Restart the Thread and the QTimer."""
         self.live_checkbox.setChecked(True)
         self.on_timer_timeout()
-        self.timer.start(self.live_spinbox.value())
+        self.timer.start()
         self.logger.debug(f'restarted the QTimer and QThread for {self.record.alias!r}')
 
     def stop_timer_and_thread(self) -> None:
