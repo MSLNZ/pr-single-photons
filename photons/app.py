@@ -276,7 +276,11 @@ class App(QtCore.QObject):
                 self.connections[arg].unlink()
                 logger.info(f'unlinked from {arg!r}')
             else:
-                self.connections[arg].disconnect_equipment()
+                try:
+                    self.connections[arg].disconnect_equipment()
+                except AttributeError:  # not a BaseEquipment instance
+                    self.connections[arg].disconnect()
+                    logger.info(f'disconnected from {arg!r}')
 
             del self.connections[arg]
             self.removed_connection.emit(arg)
