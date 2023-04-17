@@ -149,6 +149,7 @@ install_requires = [
     'google-auth-httplib2',
     'google-auth-oauthlib',
     'GTC',
+    'jupyterlab',
     'msl-equipment @ git+https://github.com/MSLNZ/msl-equipment.git',
     'msl-network',
     'msl-package-manager',
