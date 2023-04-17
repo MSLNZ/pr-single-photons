@@ -372,8 +372,10 @@ class SpatialScan(BasePlugin):
 
     def stop_monitor_and_detector_timer_and_thread(self) -> None:
         """Stop the timers/threads for the monitor/detector connection."""
-        self.monitor_widget.stop_timer_and_thread()  # noqa: DMM and NIDAQ widgets have stop_timer_and_thread()
-        self.detector_widget.stop_timer_and_thread()  # noqa: DMM and NIDAQ widgets have stop_timer_and_thread()
+        if self.monitor_widget is not None:
+            self.monitor_widget.stop_timer_and_thread()  # noqa: DMM and NIDAQ widgets have stop_timer_and_thread()
+        if self.detector_widget is not None:
+            self.detector_widget.stop_timer_and_thread()  # noqa: DMM and NIDAQ widgets have stop_timer_and_thread()
 
 
 class SpatialScanWorker(Worker):
