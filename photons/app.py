@@ -531,7 +531,7 @@ class App(QtCore.QObject):
             raise ValueError('Must create a <from> sub-element to '
                              '<smtp> in the configuration file')
 
-        recipients = to if to else [name.text for name in element.findall('to')]
+        recipients = list(to) if to else [name.text for name in element.findall('to')]
         send_email(config, recipients, sender=sender, subject=subject, body=body)
 
     def set_logging_level(self, level: int | str, *names: str) -> None:
