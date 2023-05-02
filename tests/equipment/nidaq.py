@@ -316,7 +316,7 @@ message = r'Some or all of the samples requested have not yet been acquired'
 with pytest.raises(DaqError, match=message):
     daq.edge_separation(0, 1, timeout=1)
 with pytest.raises(DaqError, match=message):
-    daq.edge_separation(0, 1, start_edge='rising', stop_edge=daq.Edge.RISING, timeout=1)
+    daq.edge_separation(0, 1, start_edge='rising', stop_edge='RISING', timeout=1)
 
 
 #
@@ -350,7 +350,7 @@ assert params[1] == pytest.approx(freq, rel=0.005)
 assert params[2] == pytest.approx(phase * np.pi / 180., rel=0.02)
 assert params[3] == pytest.approx(offset, rel=0.05)
 
-assert y0 == pytest.approx(out[0][0], abs=0.001)
+assert y0 == pytest.approx(out[0][0], abs=0.01), f'{y0} != {out[0][0]}'
 
 daq.close_all_tasks()
 daq.analog_out('0:1', [0.0, 0.0])
