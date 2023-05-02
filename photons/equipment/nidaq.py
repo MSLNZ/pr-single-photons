@@ -197,7 +197,7 @@ class NIDAQ(BaseEquipment):
     def analog_in(self,
                   channel: int | str,
                   *,
-                  config: int | str = 'BAL_DIFF',
+                  config: int | str = 'DIFF',
                   duration: float = None,
                   maximum: float = 10,
                   minimum: float = -10,
