@@ -107,3 +107,37 @@ def test_not_initialized():
         w.data()
     with pytest.raises(ValueError, match=r'has not been initialized'):
         w.meta()
+
+
+def test_remove_write_permission():
+    file = gettempdir() + '/photons-writer-testing.json'
+
+    if os.path.isfile(file):
+        # ensure it is not in read-only mode (from a previously-failed test)
+        os.chmod(file, 0o777)
+        os.remove(file)
+
+    # create file
+    w = io.PhotonWriter(file)
+    w.initialize('a', 'b', 'c')
+    w.append(0.761, -54.752, 3.628e8)
+    w.write()
+
+    # cannot open the file to modify it
+    for m in ['wb', 'ab', 'wt', 'at', 'w+', 'w+b']:
+        with pytest.raises(PermissionError):
+            open(file, mode=m)
+
+    # cannot delete the file
+    with pytest.raises(PermissionError):
+        os.remove(file)
+
+    # can still read it
+    root = read(file)
+    assert root.dataset['b'] == [-54.752]
+
+    # make it deletable
+    os.chmod(file, 0o777)
+
+    # clean up
+    os.remove(file)

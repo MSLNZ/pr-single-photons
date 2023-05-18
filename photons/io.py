@@ -9,6 +9,7 @@ from msl.equipment import EquipmentRecord
 from msl.io import JSONWriter
 from msl.io import git_head
 from msl.io import is_file_readable
+from msl.io import remove_write_permissions
 
 from .equipment.base import BaseEquipment
 from .log import logger
@@ -191,4 +192,5 @@ class PhotonWriter(JSONWriter):
         self.add_metadata(date_finished=self.now_iso())
         super().write(**kwargs)
         file = kwargs.get('file') or self.file
+        remove_write_permissions(file)
         logger.debug(f'data written to {file}')
