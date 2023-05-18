@@ -20,6 +20,7 @@ def test_write_read():
     file = gettempdir() + '/photons-writer-testing.json'
 
     if os.path.isfile(file):
+        os.chmod(file, 0o777)
         os.remove(file)
 
     w = io.PhotonWriter(file, log_size=10)
@@ -90,12 +91,14 @@ def test_write_read():
         datetime.fromisoformat(item1[0])  # converting to datetime object does not raise an error
         assert np.array_equal(tuple(item1)[1:], item2)
 
+    os.chmod(w.file, 0o777)
     os.remove(w.file)
 
 
 def test_not_initialized():
     file = gettempdir() + '/photons-writer-testing.json'
     if os.path.isfile(file):
+        os.chmod(file, 0o777)
         os.remove(file)
 
     w = io.PhotonWriter(file)
