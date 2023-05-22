@@ -156,6 +156,7 @@ install_requires = [
     'msl-qt[PySide6] @ git+https://github.com/MSLNZ/msl-qt.git',
     'nidaqmx',
     'numpy',
+    'pandas',  # required by plotly.express
     'plotly',
     'pyqtgraph',
     'pythonnet',
