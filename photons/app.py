@@ -17,6 +17,7 @@ from msl.io import read
 from msl.io import search
 from msl.io import send_email
 from msl.io.base import Root
+from msl.io.dataset import Dataset
 from msl.network import connect
 from msl.network.client import Client
 from msl.network.client import Link
@@ -384,7 +385,7 @@ class App(QtCore.QObject):
             audio.play(wav, wait=wait)
 
     @staticmethod
-    def plot(data: str | Root | np.ndarray | list | tuple = None,
+    def plot(data: str | Root | Dataset | np.ndarray | list | tuple = None,
              block: bool = True,
              **kwargs) -> QtWidgets.QApplication:
         """Show the :class:`.Plot` widget.
@@ -403,6 +404,9 @@ class App(QtCore.QObject):
             root = read(data, **kwargs)
         elif isinstance(data, Root):
             root = data
+        elif isinstance(data, Dataset):
+            root = Root('dataset')
+            root.add_dataset(data.name, data)
         elif isinstance(data, (np.ndarray, list, tuple)):
             root = Root('ndarray')
             root.create_dataset('data', data=data)
