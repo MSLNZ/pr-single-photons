@@ -3,131 +3,161 @@ Keysight 344(60|61|65|70)A digital multimeter.
 """
 import re
 
+from msl.equipment import EquipmentRecord
+
 from .base import equipment
 from .dmm import DMM
+from .dmm import Samples
+from .dmm import Settings
+from .dmm import Trigger
 
 _info_regex: re.Pattern[str] = re.compile(
     r':FUNC "(?P<FUNCTION>[A-Z]+)".*'
-    r';:TRIG:SOUR (?P<TRIGGER_SOURCE>[A-Z]+).*'
-    r';:TRIG:COUN (?P<TRIGGER_COUNT>\+\d\.\d+E[-+]\d+).*'
-    r';:TRIG:DEL (?P<TRIGGER_DELAY>\+\d\.\d+E[-+]\d+).*'
-    r';:TRIG:DEL:AUTO (?P<TRIGGER_DELAY_AUTO>\d).*'
-    r';:TRIG:SLOP (?P<TRIGGER_EDGE>[A-Z]+).*'
-    r';:SAMP:COUN \+(?P<NSAMPLES>\d+).*'
-    r';:CURR:NPLC (?P<CURRENT_NPLC>\+\d\.\d+E[-+]\d+).*'
-    r';:CURR:RANG (?P<CURRENT_RANGE>\+\d\.\d+E[-+]\d+).*'
-    r';:CURR:RANG:AUTO (?P<CURRENT_RANGE_AUTO>\d).*'
-    r';:CURR:ZERO:AUTO (?P<CURRENT_AUTO_ZERO>\d).*'
-    r';:VOLT:NPLC (?P<VOLTAGE_NPLC>\+\d\.\d+E[-+]\d+).*'
-    r';:VOLT:RANG (?P<VOLTAGE_RANGE>\+\d\.\d+E[-+]\d+).*'
-    r';:VOLT:RANG:AUTO (?P<VOLTAGE_RANGE_AUTO>\d).*'
-    r';:VOLT:ZERO:AUTO (?P<VOLTAGE_AUTO_ZERO>\d).*'
+    r':TRIG:SOUR (?P<TRIGGER_SOURCE>[A-Z]+).*'
+    r':TRIG:COUN (?P<TRIGGER_COUNT>\+\d\.\d+E[-+]\d+).*'
+    r':TRIG:DEL (?P<TRIGGER_DELAY>\+\d\.\d+E[-+]\d+).*'
+    r':TRIG:DEL:AUTO (?P<TRIGGER_AUTO_DELAY>\d).*'
+    r':TRIG:SLOP (?P<TRIGGER_EDGE>[A-Z]+).*'
+    r':SAMP:COUN \+(?P<NSAMPLES>\d+).*'
+    r':CURR:NPLC (?P<DCI_NPLC>\+\d\.\d+E[-+]\d+).*'
+    r':CURR:RANG (?P<DCI_RANGE>\+\d\.\d+E[-+]\d+).*'
+    r':CURR:RANG:AUTO (?P<DCI_AUTO_RANGE>\d).*'
+    r':CURR:ZERO:AUTO (?P<DCI_AUTO_ZERO>\d).*'
+    r':VOLT:NPLC (?P<DCV_NPLC>\+\d\.\d+E[-+]\d+).*'
+    r':VOLT:RANG (?P<DCV_RANGE>\+\d\.\d+E[-+]\d+).*'
+    r':VOLT:RANG:AUTO (?P<DCV_AUTO_RANGE>\d).*'
+    r':VOLT:ZERO:AUTO (?P<DCV_AUTO_ZERO>\d).*'
 )
 
 
 @equipment(manufacturer=r'Keysight', model=r'344(60|61|65|70)A')
 class Keysight344XXA(DMM):
-    """Keysight 344(60|61|65|70)A digital multimeter."""
+
+    def __init__(self, record: EquipmentRecord, **kwargs) -> None:
+        """Keysight 344(60|61|65|70)A digital multimeter.
+
+        Args:
+            record: The equipment record.
+            **kwargs: Keyword arguments. Can be specified as attributes
+                of an XML element in a configuration file (with the tag
+                of the element equal to the alias of `record`).
+        """
+        if record.model in ('34465A', '34470A'):
+            # these models support the ":FORMAT:DATA REAL" command
+            self._fetch_kwargs = {'fmt': 'ieee', 'dtype': '>d'}
+        else:
+            self._fetch_kwargs = {}
+
+        super().__init__(record, **kwargs)
+
+        # these must come after super()
+        self._initiate_cmd: str = 'INITIATE'
+        self._trigger_cmd: str = '*TRG'
 
     def check_errors(self) -> None:
-        """Query the digital multimeter’s error queue.
+        """Query the error queue.
 
-        If there is an error then raise an exception.
+        Raises an exception if there is an error.
         """
-        message = self.connection.query('SYSTEM:ERROR:NEXT?')
+        message = self.connection.query(':SYSTEM:ERROR:NEXT?')
         if not message.startswith('+0,'):
             self.raise_exception(message)
 
     def configure(self,
                   *,
-                  function: str = 'voltage',
-                  range: float | str = 10,  # noqa: Shadows built-in name 'range'
+                  function: DMM.Function | str = DMM.Function.DCV,
+                  range: DMM.Range | str | float = 10,  # noqa: Shadows built-in name 'range'
                   nsamples: int = 10,
                   nplc: float = 10,
-                  auto_zero: bool | int | str = True,
-                  trigger: str = 'bus',
-                  edge: str = 'falling',
+                  auto_zero: DMM.Auto | bool | int | str = DMM.Auto.ON,
+                  trigger: DMM.Mode | str = DMM.Mode.IMMEDIATE,
+                  edge: DMM.Edge | str = DMM.Edge.FALLING,
                   ntriggers: int = 1,
-                  delay: float = None) -> dict[str, ...]:
+                  delay: float = None) -> Settings:
         """Configure the digital multimeter.
 
         Args:
-            function: The function to measure.
-                Can be any key in :attr:`.DMM.FUNCTIONS` (case insensitive).
+            function: The measurement function.
             range: The range to use for the measurement.
-                Can be any key in :attr:`.DMM.RANGES`.
             nsamples: The number of samples to acquire after a trigger event.
             nplc: The number of power-line cycles.
             auto_zero: The auto-zero mode.
-                Can be any key in :attr:`.DMM.AUTO`.
             trigger: The trigger mode.
-                Can be any key in :attr:`.DMM.TRIGGERS` (case insensitive).
             edge: The edge to trigger on.
-                Can be any key in :attr:`.DMM.EDGES` (case insensitive).
-            ntriggers: The number of triggers that are accepted by the digital
-                multimeter before returning to the wait-for-trigger state.
-            delay: The trigger delay in seconds. If None, then the auto-delay
+            ntriggers: The number of triggers that are accepted before
+                returning to the wait-for-trigger state.
+            delay: The number of seconds to wait after a trigger event before
+                acquiring samples. If None, then the auto-delay
                 feature is enabled where the digital multimeter automatically
                 determines the delay based on the function, range and NPLC.
 
         Returns:
             The result of :meth:`.settings` after applying the configuration.
         """
-        function = DMM.FUNCTIONS[function.upper()]
-        range_ = DMM.RANGES.get(range, range)
-        nplc = DMM.NPLCS[float(nplc)]
-        auto_zero = DMM.AUTO[auto_zero]
-        trigger = DMM.TRIGGERS[trigger.upper()]
-        edge = DMM.EDGES[edge.upper()]
-        delay = ':AUTO ON' if delay is None else f' {delay}'  # must include a space before {delay}
+        auto_zero = self.Auto(auto_zero)
+        trigger = self.Mode(trigger)
+        delay = ':AUTO ON' if delay is None else f' {delay}'
+        range_ = self._get_range(range)
 
-        command = f'CONFIGURE:{function} {range_};' \
-                  f':{function}:NPLC {nplc};ZERO:AUTO {auto_zero};' \
-                  f':SAMPLE:COUNT {nsamples};' \
-                  f':TRIGGER:SOURCE {trigger};SLOPE {edge};COUNT {ntriggers};DELAY{delay}'
+        function = self.Function(function)
+        if function == self.Function.DCV:
+            function = 'VOLTAGE:DC'
+        elif function == self.Function.DCI:
+            function = 'CURRENT:DC'
+        else:
+            self.raise_exception(f'Unhandled function {function!r}')
 
-        self.logger.info(f'configure {self.alias!r} using {command!r}')
-        self._send_command_with_opc(command)
-        self.check_errors()
-        settings = self.settings()
-        self.settings_changed.emit(settings)
-        self.maybe_emit_notification(**settings)
-        return settings
+        self._zero_once_cmd = f'{function}:ZERO:AUTO ONCE'
 
-    def settings(self) -> dict[str, ...]:
-        """Returns the configuration settings of the digital multimeter.
-        ::
+        edge = self.Edge(edge)
+        if edge == self.Edge.RISING:
+            edge = 'POSITIVE'
+        elif edge == self.Edge.FALLING:
+            edge = 'NEGATIVE'
+        else:
+            self.raise_exception(f'Unsupported trigger edge {edge!r}')
 
-            {
-              'auto_range': str,
-              'auto_zero': str,
-              'function': str,
-              'nplc': float,
-              'nsamples': int,
-              'range': float,
-              'trigger_count': int,
-              'trigger_delay': float,
-              'trigger_delay_auto': bool,
-              'trigger_edge': str,
-              'trigger_mode': str,
-            }
+        fmt = ':FORMAT:DATA REAL;' if self._fetch_kwargs else ''
+
+        return self._configure(
+            f':CONFIGURE:{function} {range_};'
+            f':SENSE:{function}:NPLC {nplc};'
+            f':SENSE:{function}:ZERO:AUTO {auto_zero};'
+            f':SAMPLE:COUNT {nsamples};'
+            f':TRIGGER:SOURCE {trigger};SLOPE {edge};COUNT {ntriggers};DELAY{delay};'
+            f'{fmt}'
+        )
+
+    def fetch(self, initiate: bool = False) -> Samples:
+        """Fetch the samples.
+
+        Args:
+            initiate: Whether to call :meth:`.initiate` before fetching the data.
         """
+        if initiate:
+            self.initiate()
+        self.logger.info(f'fetch {self.alias!r}')
+        samples = self.connection.query('FETCH?', **self._fetch_kwargs)
+        return self._average_and_emit(samples)
+
+    def settings(self) -> Settings:
+        """Returns the configuration settings of the digital multimeter."""
         match = _info_regex.search(self.connection.query('*LRN?'))
         if not match:
             self.raise_exception(f'invalid regex pattern for {self.alias!r}')
-        d = match.groupdict()
-        function = DMM.FUNCTIONS[d['FUNCTION']]
-        edge = DMM.EDGES[d['TRIGGER_EDGE']]
-        return {
-            'auto_range': DMM.AUTO[d[f'{function}_RANGE_AUTO']],
-            'auto_zero': DMM.AUTO[d[f'{function}_AUTO_ZERO']],
-            'function': function,
-            'nplc': float(d[f'{function}_NPLC']),
-            'nsamples': int(d['NSAMPLES']),
-            'range': float(d[f'{function}_RANGE']),
-            'trigger_count': int(float(d['TRIGGER_COUNT'])),
-            'trigger_delay': float(d['TRIGGER_DELAY']),
-            'trigger_delay_auto': d['TRIGGER_DELAY_AUTO'] == '1',
-            'trigger_edge': 'FALLING' if edge == 'NEGATIVE' else 'RISING',
-            'trigger_mode': DMM.TRIGGERS[d['TRIGGER_SOURCE']],
-        }
+        function = self.Function(match['FUNCTION'])
+        return Settings(
+            auto_range=match[f'{function}_AUTO_RANGE'],
+            auto_zero=match[f'{function}_AUTO_ZERO'],
+            function=function,
+            nplc=match[f'{function}_NPLC'],
+            nsamples=match['NSAMPLES'],
+            range=match[f'{function}_RANGE'],
+            trigger=Trigger(
+                auto_delay=match['TRIGGER_AUTO_DELAY'] == '1',
+                count=match['TRIGGER_COUNT'],
+                delay=match['TRIGGER_DELAY'],
+                edge=match['TRIGGER_EDGE'],
+                mode=match['TRIGGER_SOURCE'],
+            )
+        )

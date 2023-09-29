@@ -2,12 +2,14 @@
 Hewlett Packard 34401A digital multimeter.
 """
 import re
+import warnings
 
 from msl.equipment import EquipmentRecord
-from msl.equipment.connection_serial import ConnectionSerial
 
 from .base import equipment
 from .dmm import DMM
+from .dmm import Settings
+from .dmm import Trigger
 from ..samples import Samples
 
 # Reduce the number of writes/reads that are needed when calling
@@ -24,11 +26,11 @@ _command1 = 'CONFIGURE?;' \
 
 _command1_regex: re.Pattern[str] = re.compile(
     r'(?P<FUNCTION>[A-Z]+)\s(?P<RANGE>(\+\d\.\d+E[-+]\d+)),.*;'
-    r'(?P<CURRENT_RANGE_AUTO>\d);'
-    r'(?P<VOLTAGE_RANGE_AUTO>\d);'
+    r'(?P<DCI_AUTO_RANGE>\d);'
+    r'(?P<DCV_AUTO_RANGE>\d);'
     r'(?P<AUTO_ZERO>\d);'
-    r'(?P<CURRENT_NPLC>\+\d\.\d+E[-+]\d+);'
-    r'(?P<VOLTAGE_NPLC>\+\d\.\d+E[-+]\d+)'
+    r'(?P<DCI_NPLC>\+\d\.\d+E[-+]\d+);'
+    r'(?P<DCV_NPLC>\+\d\.\d+E[-+]\d+)'
 )
 
 _command2 = 'SAMPLE:COUNT?;' \
@@ -42,7 +44,7 @@ _command2_regex: re.Pattern[str] = re.compile(
     r'(?P<TRIGGER_SOURCE>[A-Z]+);'
     r'(?P<TRIGGER_COUNT>\+\d\.\d+E[-+]\d+);'
     r'(?P<TRIGGER_DELAY>\+\d\.\d+E[-+]\d+);'
-    r'(?P<TRIGGER_DELAY_AUTO>\d)'
+    r'(?P<TRIGGER_AUTO_DELAY>\d)'
 )
 
 
@@ -59,22 +61,37 @@ class HP34401A(DMM):
                 of the element equal to the alias of `record`).
         """
         super().__init__(record, **kwargs)
-        self._rs232: bool = isinstance(self.connection, ConnectionSerial)
+        self._trigger_cmd: str = 'updated in configure()'
+        self._zero_once_cmd: str = 'ZERO:AUTO ONCE'
+        self._prologix: bool = self.record.connection.address.startswith('Prologix')
+        self._pyvisa: bool = hasattr(self.connection, 'resource')
+        self._rs232: bool = hasattr(self.connection, 'serial')
         if self._rs232:
+            self.connection.serial.dtrdsr = True  # noqa: connection has serial attribute
             self.remote_mode()
 
-    def bus_trigger(self) -> None:
-        """Send a software trigger to the digital multimeter."""
-        self.logger.info(f'software trigger {self.alias!r}')
+    def abort(self) -> None:
+        """Abort a measurement in progress."""
+        # Only the self._pyvisa case is working reliably with GPIB-USB-HS+ adapter
+        self.logger.info(f'abort measurement {self.alias!r}')
         if self._rs232:
-            self.connection.write('INIT;*TRG;*OPC?')
+            # From the HP 34401A manual "DTR/DSR Handshake Protocol" (Chapter 4, page 152):
+            #   For the <Ctrl-C> character to be recognized reliably by the multimeter
+            #   while it holds DTR FALSE, the controller must first set DSR FALSE.
+            # PySerial does not allow for the DSR pin to be set, it is a read-only attribute.
+            self.connection.serial.dtr = True  # noqa: connection has serial attribute
+            self.connection.write(b'\x03')  # Ctrl-C ASCII character
+        elif self._prologix:
+            self.connection.write(b'++clr')
+        elif self._pyvisa:
+            self.connection.resource.clear()  # noqa: connection has resource attribute
         else:
-            self.connection.write('INIT;*TRG;*OPC')
+            self.raise_exception(f'abort() not handled for {self.alias!r}')
 
     def check_errors(self) -> None:
-        """Query the error queue of the digital multimeter.
+        """Query the error queue.
 
-        If there is an error then raise an exception.
+        Raises an exception if there is an error.
         """
         message = self.connection.query('SYSTEM:ERROR?')
         if not message.startswith('+0,'):
@@ -82,88 +99,120 @@ class HP34401A(DMM):
 
     def configure(self,
                   *,
-                  function: str = 'voltage',
-                  range: float | str = 10,  # noqa: Shadows built-in name 'range'
+                  function: DMM.Function | str = DMM.Function.DCV,
+                  range: DMM.Range | str | float = 10,  # noqa: Shadows built-in name 'range'
                   nsamples: int = 10,
                   nplc: float = 10,
-                  auto_zero: bool | str = True,
-                  trigger: str = 'bus',
-                  edge: str = 'falling',
+                  auto_zero: DMM.Auto | bool | int | str = DMM.Auto.ON,
+                  trigger: DMM.Mode | str = DMM.Mode.IMMEDIATE,
+                  edge: DMM.Edge | str = DMM.Edge.FALLING,
                   ntriggers: int = 1,
-                  delay: float = None) -> dict[str, ...]:
+                  delay: float = None) -> Settings:
         """Configure the digital multimeter.
 
         Args:
-            function: The function to measure.
-                Can be any key in :attr:`.DMM.FUNCTIONS` (case insensitive).
+            function: The measurement function.
             range: The range to use for the measurement.
-                Can be any key in :attr:`.DMM.RANGES`.
             nsamples: The number of samples to acquire after a trigger event.
             nplc: The number of power-line cycles.
             auto_zero: The auto-zero mode.
-                Can be any key in :attr:`.DMM.AUTO`.
             trigger: The trigger mode.
-                Can be any key in :attr:`.DMM.TRIGGERS` (case insensitive).
             edge: The edge to trigger on.
-                Can be any key in :attr:`.DMM.EDGES` (case insensitive).
-            ntriggers: The number of triggers that are accepted by the digital
-                multimeter before returning to the wait-for-trigger state.
-            delay: The trigger delay in seconds. If None, then the auto-delay
+            ntriggers: The number of triggers that are accepted before
+                returning to the wait-for-trigger state.
+            delay: The number of seconds to wait after a trigger event before
+                acquiring samples. If None, then the auto-delay
                 feature is enabled where the digital multimeter automatically
                 determines the delay based on the function, range and NPLC.
 
         Returns:
             The result of :meth:`.settings` after applying the configuration.
         """
-        edge = DMM.EDGES[edge.upper()]
-        if edge != 'NEGATIVE':
+        auto_zero = self.Auto(auto_zero)
+        delay = ':AUTO ON' if delay is None else f' {delay}'
+
+        readings = nsamples * ntriggers
+        if readings > 512:
+            self.raise_exception(
+                f'Invalid number of samples, {readings}, for '
+                f'{self.alias!r}. Must be <= 512')
+
+        trigger = self.Mode(trigger)
+        self._initiate_cmd = 'INITIATE'
+        self._trigger_cmd = '*TRG'
+        if self._rs232:
+            if trigger in (self.Mode.IMMEDIATE, self.Mode.EXTERNAL):
+                self._initiate_cmd += ';*OPC?'
+            elif trigger == self.Mode.BUS:
+                self._trigger_cmd += ';*OPC?'
+
+        if not self._pyvisa and trigger == self.Mode.EXTERNAL:
+            warnings.warn(f'Trigger {trigger} is only reliable with '
+                          f'the GPIB-USB-HS+ adaptor.',
+                          stacklevel=2)
+
+        function = self.Function(function)
+        if function == self.Function.DCV:
+            function = 'VOLTAGE:DC'
+        elif function == self.Function.DCI:
+            function = 'CURRENT:DC'
+        else:
+            self.raise_exception(f'Unhandled function {function!r}')
+
+        edge = self.Edge(edge)
+        if edge != self.Edge.FALLING:
             self.raise_exception(f'Can only trigger {self.alias!r} on '
                                  f'the falling (negative) edge')
 
-        function = DMM.FUNCTIONS[function.upper()]
-        range_ = DMM.RANGES.get(range, range)
-        nplc = DMM.NPLCS[float(nplc)]
-        auto_zero = DMM.AUTO[auto_zero]
-        trigger = DMM.TRIGGERS[trigger.upper()]
-        delay = ':AUTO ON' if delay is None else f' {delay}'  # must include a space before {delay}
+        range_ = self._get_range(range)
 
-        command = f'CONFIGURE:{function} {range_};' \
-                  f':{function}:NPLC {nplc};' \
-                  f':SENSE:ZERO:AUTO {auto_zero};' \
-                  f':SAMPLE:COUNT {nsamples};' \
-                  f':TRIGGER:SOURCE {trigger};COUNT {ntriggers};DELAY{delay}'
+        return self._configure(
+            f':CONFIGURE:{function} {range_};'
+            f':SENSE:{function}:NPLC {nplc};'
+            f':SENSE:ZERO:AUTO {auto_zero};'
+            f':SAMPLE:COUNT {nsamples};'
+            f':TRIGGER:SOURCE {trigger};COUNT {ntriggers};DELAY{delay};'
+        )
 
-        self.logger.info(f'configure {self.alias!r} using {command!r}')
-        self._send_command_with_opc(command)
-        self.check_errors()
-        settings = self.settings()
-        self.settings_changed.emit(settings)
-        self.maybe_emit_notification(**settings)
-        return settings
+    def disconnect_equipment(self) -> None:
+        """Set the digital multimeter to be in LOCAL mode and then close the connection."""
+        self.local_mode()
+        super().disconnect_equipment()
 
     def fetch(self, initiate: bool = False) -> Samples:
         """Fetch the samples.
 
         Args:
-            initiate: Whether to send INIT before FETCH?.
+            initiate: Whether to call :meth:`.initiate` before fetching the data.
         """
-        if not initiate and self._rs232:
-            if not self.connection.read().startswith('1'):
-                self.raise_exception('*OPC? from bus_trigger did not return 1')
-        return super().fetch(initiate=initiate)
+        if initiate:
+            self.initiate()
+
+        if self._rs232:
+            self.logger.info(f'fetch {self.alias!r} | waiting for *OPC? reply...')
+            assert self.connection.read().startswith('1')
+        else:
+            self.logger.info(f'fetch {self.alias!r}')
+
+        samples = self.connection.query('FETCH?')
+        return self._average_and_emit(samples)
 
     def local_mode(self) -> None:
         """Set the multimeter to be in LOCAL mode for the RS-232 interface.
 
         All keys on the front panel are fully functional.
         """
-        if not self._rs232:
-            self.logger.warning(f'setting {self.alias!r} to LOCAL mode is '
-                                f'only valid for the RS-232 interface')
-            return
-
         self.logger.info(f'set {self.alias!r} to LOCAL mode')
-        self._send_command_with_opc('SYSTEM:LOCAL')
+        if self._rs232:
+            self._send_command_with_opc('SYSTEM:LOCAL')
+        elif self._pyvisa:
+            # VI_GPIB_REN_ASSERT_GTL = 6
+            self.connection.resource.control_ren(6)  # noqa: connection has resource attribute
+        elif self._prologix:
+            self.connection.write(b'++loc')
+        else:
+            self.logger.warning(f'setting {self.alias!r} to LOCAL mode has '
+                                f'not been implemented')
 
     def remote_mode(self) -> None:
         """Set the multimeter to be in REMOTE mode for the RS-232 interface.
@@ -178,48 +227,25 @@ class HP34401A(DMM):
         self.logger.info(f'set {self.alias!r} to REMOTE mode')
         self._send_command_with_opc('SYSTEM:REMOTE')
 
-    def settings(self) -> dict[str, ...]:
-        """Returns the configuration settings of the digital multimeter.
-        ::
-
-            {
-              'auto_range': str,
-              'auto_zero': str,
-              'function': str,
-              'nplc': float,
-              'nsamples': int,
-              'range': float,
-              'trigger_count': int,
-              'trigger_delay': float,
-              'trigger_delay_auto': bool,
-              'trigger_edge': str,
-              'trigger_mode': str,
-            }
-        """
+    def settings(self) -> Settings:
+        """Returns the configuration settings of the digital multimeter."""
         match1 = _command1_regex.search(self.connection.query(_command1))
         match2 = _command2_regex.search(self.connection.query(_command2))
         if not match1 or not match2:
             self.raise_exception(f'invalid regex pattern for {self.alias!r}')
-
-        d1 = match1.groupdict()
-        d2 = match2.groupdict()
-        function = DMM.FUNCTIONS[d1['FUNCTION']]
-        return {
-            'auto_range': DMM.AUTO[d1[f'{function}_RANGE_AUTO']],
-            'auto_zero': DMM.AUTO[d1['AUTO_ZERO']],
-            'function': function,
-            'nplc': float(d1[f'{function}_NPLC']),
-            'nsamples': int(d2['NSAMPLES']),
-            'range': float(d1['RANGE']),
-            'trigger_count': int(float(d2['TRIGGER_COUNT'])),
-            'trigger_delay': float(d2['TRIGGER_DELAY']),
-            'trigger_delay_auto': d2['TRIGGER_DELAY_AUTO'] == '1',
-            'trigger_edge': 'FALLING',  # only triggers on the falling edge of an external TTL pulse
-            'trigger_mode': DMM.TRIGGERS[d2['TRIGGER_SOURCE']],
-        }
-
-    def disconnect_equipment(self) -> None:
-        """Set the digital multimeter to be in LOCAL mode and then close the connection."""
-        if self._rs232:
-            self.local_mode()
-        super().disconnect_equipment()
+        function = self.Function(match1['FUNCTION'])
+        return Settings(
+            auto_range=match1[f'{function}_AUTO_RANGE'],
+            auto_zero=match1['AUTO_ZERO'],
+            function=function,
+            nplc=match1[f'{function}_NPLC'],
+            nsamples=match2['NSAMPLES'],
+            range=match1['RANGE'],
+            trigger=Trigger(
+                auto_delay=match2['TRIGGER_AUTO_DELAY'] == '1',
+                count=match2['TRIGGER_COUNT'],
+                delay=match2['TRIGGER_DELAY'],
+                edge=self.Edge.FALLING,
+                mode=match2['TRIGGER_SOURCE'],
+            )
+        )
