@@ -394,12 +394,8 @@ class SpatialScanWorker(Worker):
         self.shutter = parent.shutter
 
         self.detector_settings = {}
-        self.send_detector_bus_trigger = False
         if self.is_detector_dmm:
             self.detector_settings = self.detector.settings()
-            tm = self.detector_settings['trigger_mode']
-            self.send_detector_bus_trigger = (tm == 'BUS') or \
-                (tm == 'AUTO' and self.detector.record_to_json()['model'] == '3458A')
 
         if not parent.is_detector_dmm:
             widget = typing.cast(DAQCounterWidget, parent.detector_widget)
@@ -416,9 +412,9 @@ class SpatialScanWorker(Worker):
         Returns:
             (monitor samples, detector samples)
         """
-        self.monitor.bus_trigger()
-        if self.send_detector_bus_trigger:
-            self.detector.bus_trigger()
+        self.monitor.initiate()
+        if self.is_detector_dmm:
+            self.detector.initiate()
         # read DUT before monitor since DUT could be connected to a counter or the SIA from CMI
         dut = self.read_dut()
         mon = self.monitor.fetch()
@@ -468,15 +464,15 @@ class SpatialScanWorker(Worker):
             detector_info=self.detector_settings,
             monitor_info=self.monitor.settings(),
             x_start=x_original,
-            x_step=round(x_values[1] - x_values[0], 4) if len(x_values) > 1 else 0.0,
+            x_step=round(float(x_values[1] - x_values[0]), 4) if len(x_values) > 1 else 0.0,
             x_stop=np.max(x_values),
             x_unit=x_stage.info()['unit'].strip(),
             y_start=y_original,
-            y_step=round(y_values[1] - y_values[0], 4) if len(y_values) > 1 else 0.0,
+            y_step=round(float(y_values[1] - y_values[0]), 4) if len(y_values) > 1 else 0.0,
             y_stop=np.max(y_values),
             y_unit=y_stage.info()['unit'].strip(),
             z_start=z_original,
-            z_step=round(z_values[1] - z_values[0], 4) if len(z_values) > 1 else 0.0,
+            z_step=round(float(z_values[1] - z_values[0]), 4) if len(z_values) > 1 else 0.0,
             z_stop=np.max(z_values),
             z_unit=z_stage.info()['unit'].strip()
         )
@@ -547,6 +543,6 @@ class SpatialScanWorker(Worker):
     def read_dut(self) -> Samples:
         """Read the samples for the device-under-test."""
         if self.is_detector_dmm:
-            return self.detector.fetch(initiate=not self.send_detector_bus_trigger)
+            return self.detector.fetch()
         else:
             return self.detector.count_edges(**self.count_edges_kwargs)
