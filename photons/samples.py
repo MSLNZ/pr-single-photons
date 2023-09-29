@@ -314,6 +314,12 @@ class Samples:
     def __repr__(self) -> str:
         return f'Samples(mean={self.mean}, stdev={self.stdev}, size={self.size})'
 
+    def __getitem__(self, item) -> float:
+        return self._samples[item]
+
+    def __len__(self) -> int:
+        return self._samples.size
+
     def _check_overload(self, mean: float) -> float:
         if self._overload is None:
             return mean

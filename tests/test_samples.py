@@ -2127,3 +2127,16 @@ def test_to_ureal():
     assert un.u == 0.0
     assert un.df == 9
     assert un.label == 'digitized'
+
+
+def test_len():
+    s = Samples(range(8))
+    assert len(s) == 8
+
+
+def test_subscriptable():
+    s = Samples([3, 6, 1, 8])
+    assert s[0] == 3
+    assert s[1] == 6
+    assert s[2] == 1
+    assert s[3] == 8
