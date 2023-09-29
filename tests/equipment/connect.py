@@ -31,7 +31,7 @@ def device(aliases: str | tuple[str, ...], message: str) -> tuple[App, Connectio
     if len(aliases) == 1:
         info = f'{devs.record}'
     else:
-        info = '\n'.join(dev.record for dev in devs)
+        info = '\n'.join(str(dev.record) for dev in devs)
 
     if not app.prompt.yes_no(f'{message}\n\n{info}'):
         app.disconnect_equipment()
