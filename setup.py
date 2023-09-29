@@ -206,6 +206,7 @@ setup(
         'Topic :: Scientific/Engineering',
     ],
     setup_requires=sphinx + pytest_runner,
+    python_requires='>=3.10',
     tests_require=tests_require,
     install_requires=install_requires,
     extras_require={
