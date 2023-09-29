@@ -11,7 +11,7 @@ scope.configure_timebase()
 scope.configure_trigger()
 scope.run()
 scope.single()
-scope.software_trigger()
+scope.trigger()
 scope.stop()
 
 data = scope.waveform(1, 'chan2', 'channel3', 4)

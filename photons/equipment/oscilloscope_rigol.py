@@ -125,8 +125,8 @@ class RigolOscilloscope(Oscilloscope):
         self.logger.info(f'single shot {self.alias!r}')
         self._check(':SINGLE')
 
-    def software_trigger(self) -> None:
-        """Send a trigger signal."""
+    def trigger(self) -> None:
+        """Send a software trigger."""
         self.logger.info(f'software trigger {self.alias!r}')
         self._check(':TFORCE')
 

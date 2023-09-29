@@ -43,8 +43,8 @@ class Oscilloscope(BaseEquipment):
         """Capture and display a single acquisition."""
         raise NotImplementedError
 
-    def software_trigger(self) -> None:
-        """Send a trigger signal."""
+    def trigger(self) -> None:
+        """Send a software trigger."""
         raise NotImplementedError
 
     def stop(self) -> None:
