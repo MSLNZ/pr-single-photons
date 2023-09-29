@@ -167,7 +167,11 @@ install_requires = [
 
 tests_require = ['pytest', 'pytest-cov']
 
-docs_require = ['sphinx', 'sphinx-rtd-theme', 'sphinx-autodoc-typehints']
+docs_require = [
+    'sphinx>2',  # >2 required for ReadTheDocs
+    'sphinx-rtd-theme>0.5',  # >0.5 required for ReadTheDocs
+    'sphinx-autodoc-typehints',
+]
 
 testing = {'test', 'tests'}.intersection(sys.argv)
 pytest_runner = ['pytest-runner'] if testing else []
