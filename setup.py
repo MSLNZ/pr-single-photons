@@ -196,12 +196,11 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Topic :: Software Development',
         'Topic :: Scientific/Engineering',
     ],
-    python_requires='>=3.10',
+    python_requires='>=3.11',
     tests_require=tests_require,
     install_requires=install_requires,
     extras_require={
