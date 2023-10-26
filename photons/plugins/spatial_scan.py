@@ -462,7 +462,7 @@ class SpatialScanWorker(Worker):
             delay=self.delay,
             delay_unit='seconds',
             detector_info=self.detector_settings,
-            monitor_info=self.monitor.settings(),
+            monitor_info=self.monitor.settings().to_json(),
             x_start=x_original,
             x_step=round(float(x_values[1] - x_values[0]), 4) if len(x_values) > 1 else 0.0,
             x_stop=np.max(x_values),
