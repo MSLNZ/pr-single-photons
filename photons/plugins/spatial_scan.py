@@ -322,7 +322,10 @@ class SpatialScan(BasePlugin):
         self.main.status_bar_message.emit(f'{self.windowTitle()} finished [took {hms}]')
         self.main.hide_progress_bar.emit()
         self.app.send_email(subject=f'{self.windowTitle()} finished', body=f'Took {hms}')
-        audio.random()
+        try:
+            audio.random()
+        except RuntimeError as e:  # can occur if using Remote Desktop
+            self.app.logger.warning(f'{e.__class__.__name__}: {e}')
 
     @Slot()
     def on_worker_start(self) -> None:
