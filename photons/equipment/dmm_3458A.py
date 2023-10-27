@@ -3,8 +3,8 @@ Keysight 3458A digital multimeter.
 """
 import warnings
 
-from msl.equipment import Backend
 from msl.equipment import EquipmentRecord
+from msl.equipment.constants import Interface
 
 from .base import equipment
 from .dmm import DMM
@@ -29,7 +29,7 @@ class Keysight3458A(DMM):
         self._nreadings: int = 1
         self._trigger_mode: DMM.Mode = DMM.Mode.IMMEDIATE
         self._prologix: bool = record.connection.address.startswith('Prologix')
-        self._pyvisa: bool = record.connection.backend == Backend.PyVISA
+        self._gpib: bool = record.connection.interface == Interface.GPIB
         self._check_revision: bool = True
 
         super().__init__(record, **kwargs)
@@ -57,12 +57,10 @@ class Keysight3458A(DMM):
         self.logger.info(f'clear {self.alias!r}')
         if self._prologix:
             self.connection.write(b'++clr')
-        elif self._pyvisa:
-            self.connection.resource.clear()  # noqa: connection has resource attribute
+        elif self._gpib:
+            self.connection.clear()   # noqa: ConnectionGPIB has a clear() method
         else:
-            self.raise_exception(
-                f'{self.alias!r} clear() has not been '
-                f'implemented yet for a non-Prologix interface')
+            self.raise_exception(f'{self.alias!r} clear() has not been implemented yet')
 
     def configure(self,
                   *,
@@ -129,13 +127,14 @@ class Keysight3458A(DMM):
                                   stacklevel=2)
 
             self._initiate_cmd = f'MEM FIFO;TARM SGL,{ntriggers};MEM OFF'
-            if self._pyvisa:
-                # Turning the INBUF ON/OFF is required because the PyVISA write()
-                # method waits for a return value. Therefore, when self.initiate()
-                # is called, it blocks until PyVISA raises a timeout error or
-                # until PyVISA write() receives a return value.
+            if self._gpib:
+                # Turning the INBUF ON/OFF is required because the GPIB write()
+                # method waits for the count() return value. Therefore, when
+                # self.initiate() is called, it blocks until a timeout error is
+                # raised or until count() receives a return value.
                 #
-                # Used the NI GPIB-USB-HS+ adapter to communicate with the DMM.
+                # Used the NI GPIB-USB-HS+ adapter to communicate with the DMM
+                # to determine this caveat.
                 self._initiate_cmd = 'INBUF ON;INBUF OFF;' + self._initiate_cmd
             elif self._prologix:
                 warnings.warn(f'Trigger {mode} is not reliable when using '

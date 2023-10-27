@@ -5,6 +5,7 @@ import re
 import warnings
 
 from msl.equipment import EquipmentRecord
+from msl.equipment.constants import Interface
 
 from .base import equipment
 from .dmm import DMM
@@ -64,8 +65,8 @@ class HP34401A(DMM):
         self._trigger_cmd: str = 'updated in configure()'
         self._zero_once_cmd: str = 'ZERO:AUTO ONCE'
         self._prologix: bool = self.record.connection.address.startswith('Prologix')
-        self._pyvisa: bool = hasattr(self.connection, 'resource')
-        self._rs232: bool = hasattr(self.connection, 'serial')
+        self._gpib: bool = record.connection.interface == Interface.GPIB
+        self._rs232: bool = record.connection.interface == Interface.SERIAL
         if self._rs232:
             self.connection.serial.dtrdsr = True  # noqa: connection has serial attribute
             self.remote_mode()
@@ -81,10 +82,10 @@ class HP34401A(DMM):
             # PySerial does not allow for the DSR pin to be set, it is a read-only attribute.
             self.connection.serial.dtr = True  # noqa: connection has serial attribute
             self.connection.write(b'\x03')  # Ctrl-C ASCII character
+        elif self._gpib:
+            self.connection.clear()  # noqa: ConnectionGPIB has a clear() method
         elif self._prologix:
             self.connection.write(b'++clr')
-        elif self._pyvisa:
-            self.connection.resource.clear()  # noqa: connection has resource attribute
         else:
             self.raise_exception(f'abort() not handled for {self.alias!r}')
 
@@ -146,7 +147,7 @@ class HP34401A(DMM):
             elif trigger == self.Mode.BUS:
                 self._trigger_cmd += ';*OPC?'
 
-        if not self._pyvisa and trigger == self.Mode.EXTERNAL:
+        if not self._gpib and trigger == self.Mode.EXTERNAL:
             warnings.warn(f'Trigger {trigger} is only reliable with '
                           f'the GPIB-USB-HS+ adaptor.',
                           stacklevel=2)
@@ -205,9 +206,8 @@ class HP34401A(DMM):
         self.logger.info(f'set {self.alias!r} to LOCAL mode')
         if self._rs232:
             self._send_command_with_opc('SYSTEM:LOCAL')
-        elif self._pyvisa:
-            # VI_GPIB_REN_ASSERT_GTL = 6
-            self.connection.resource.control_ren(6)  # noqa: connection has resource attribute
+        elif self._gpib:
+            self.connection.local()  # noqa: ConnectionGPIB has a local() method
         elif self._prologix:
             self.connection.write(b'++loc')
         else:
