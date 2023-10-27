@@ -64,6 +64,6 @@ logging.basicConfig(
     datefmt='%Y-%m-%dT%H:%M:%S',
 )
 
-set_errors('asyncio', 'urllib3')
+set_errors('asyncio', 'urllib3', 'matplotlib')
 set_block('pyvisa', 'pyvisa-py')
 set_warnings('msl', 'google', 'googleapiclient')
