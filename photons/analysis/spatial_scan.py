@@ -485,8 +485,7 @@ class Main(QtWidgets.QWidget):
             y = re.search(r'Y=(\d+\.\d+),', self.y_plot.titleLabel.text).group(1)
             self.save_plot_as_csv('Y', y, self.y_plot.items[0].getData())
 
-    def save_plot_as_csv(self, axis, value, data):
-        print(axis, value, data)
+    def save_plot_as_csv(self, axis: str, value: float, data: tuple[np.ndarray, np.ndarray]) -> None:
         filename = os.path.splitext(self.filename)[0] + f'_{axis}={value}mm.csv'
         xy = 'X' if axis == 'Y' else 'Y'
         positions, signals = data
