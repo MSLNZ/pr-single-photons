@@ -445,9 +445,13 @@ class ConfigureDialog(QtWidgets.QDialog):
 
     def save_settings(self) -> None:
         """Save the settings to the digital multimeter."""
+        try:
+            rng = float(self.range_line_edit.text())
+        except ValueError:
+            rng = self.range_line_edit.text()
         self.connection.configure(
             function=self.function_combobox.currentText(),
-            range=self.range_line_edit.text(),
+            range=rng,
             nsamples=self.nsamples_spinbox.value(),
             nplc=float(self.nplc_spinbox.value()),
             auto_zero=self.auto_zero_combobox.currentText(),
