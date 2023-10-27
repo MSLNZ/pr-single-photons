@@ -70,8 +70,8 @@ def cli_parser(*args: str) -> argparse.Namespace:
         nargs='?',
         type=float,
         const=2.0,
-        help='find COM, USB and LAN devices, the optional value corresponds to the\n'
-             'timeout for LAN devices (default is 2 seconds)'
+        help='find equipment, the optional value corresponds to the\n'
+             'timeout for network devices (default is 2 seconds)'
     )
     p.add_argument(
         '--no-user',
@@ -117,10 +117,10 @@ def main(*args: str) -> None:
         * | Start a JupyterLab web server
           | ``photons --jupyter``
 
-        * | Find COM, USB and LAN devices
+        * | Find equipment
           | ``photons --find``
 
-        * | Find COM, USB and LAN devices (with a 5-second timeout for LAN devices)
+        * | Find equipment (with a 5-second timeout for network devices)
           | ``photons --find 5``
 
     """
@@ -128,9 +128,11 @@ def main(*args: str) -> None:
     if args.jupyter:
         sys.exit(start_jupyter(args.config, args.no_user))
     if args.find is not None:
-        print(f'Finding COM, USB and LAN devices (LAN timeout is {args.find} seconds)...\n')
-        from msl.equipment import print_resources
-        sys.exit(print_resources(timeout=args.find))
+        print(f'Finding equipment (network timeout is {args.find} seconds)...\n')
+        from subprocess import check_output
+        out = check_output(['find-equipment', '--timeout', str(args.find)])
+        print(out.decode())
+        sys.exit()
     if not (args.alias or args.name):
         sys.exit(start_app(args.config, args.no_user))
     sys.exit(start_service(**args.__dict__))
