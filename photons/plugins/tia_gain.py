@@ -261,8 +261,8 @@ class TIAGainWorker(Worker):
                     # (out of the N samples that were requested) that is 1e+38
                     # causing a NaN to be written to the file. Keep fetching samples
                     # until only finite values are returned from the DMM.
-                    femto.bus_trigger()
-                    dmm.bus_trigger()
+                    femto.initiate()
+                    dmm.initiate()
                     dmm_samples = dmm.fetch()
                     femto_samples = femto.fetch()
                     if not isnan(dmm_samples.mean) or abort_event.is_set():
