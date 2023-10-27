@@ -1,6 +1,11 @@
+"""
+Visualise data from the Spatial Scan plugin.
+"""
 import os
 import re
 import sys
+from queue import Queue
+from typing import Callable
 from xml.etree.ElementTree import ElementTree
 
 import numpy as np
@@ -8,20 +13,73 @@ import pyqtgraph as pg
 from msl.io import read
 from msl.qt import LineEdit
 from msl.qt import Qt
+from msl.qt import QtCore
 from msl.qt import QtGui
 from msl.qt import QtWidgets
+from msl.qt import Signal
+from msl.qt import Slot
+from msl.qt import Thread
+from msl.qt import Worker
 from msl.qt import application
 from msl.qt import convert
 from msl.qt import excepthook
 from msl.qt import prompt
 from msl.qt import utils
 
+from photons.log import logger
+from photons.nlf import SuperGaussian
 from photons.utils import std_relative
+
+
+class FitQueue(Queue):
+
+    def clear_put(self, x: np.ndarray, y: np.ndarray, typ: str, clear: bool) -> None:
+        """Maybe clear the queue and put the latest x, y data to fit."""
+        if clear:
+            self.queue.clear()
+        self.put_nowait((x, y, typ))
+
+
+class FitWorker(Worker):
+
+    result = Signal(dict)
+
+    def __init__(self, queue: Queue) -> None:
+        super().__init__()
+        self.queue: Queue = queue
+        self.super_gaussian = SuperGaussian()
+
+    def process(self) -> None:
+        while True:
+            x, y, typ = self.queue.get()
+            if x.size == 0:
+                break
+            try:
+                result = self.super_gaussian.fit(x, y)
+            except OSError as e:
+                logger.warning(e)
+                continue
+            x_fit = np.linspace(x[0], x[-1], num=100)
+            y_fit = self.super_gaussian.evaluate(x_fit, result)
+            self.result.emit({
+                'type': typ,
+                'x': x,
+                'y': y,
+                'x_fit': x_fit,
+                'y_fit': y_fit,
+                'params': result.params
+            })
+
+
+class FitThread(Thread):
+
+    def __init__(self) -> None:
+        super().__init__(FitWorker)
 
 
 class Main(QtWidgets.QWidget):
 
-    def __init__(self, file=None):
+    def __init__(self, file: str = None) -> None:
         """Main widget."""
         super().__init__()
         self.setAcceptDrops(True)
@@ -37,6 +95,16 @@ class Main(QtWidgets.QWidget):
         self.y_unique = np.empty(0)
         self.dy = 0
         self.z_value = None
+        self.x_pos = -1
+        self.y_pos = -1
+        self.clear_fit_queue = True
+
+        self.fit_params_x = None
+        self.fit_params_y = None
+        self.fit_queue = FitQueue()
+        self.fit_thread = FitThread()
+        self.fit_thread.start(self.fit_queue)
+        self.fit_thread.worker_connect(FitWorker.result, self.plot_x_or_y)
 
         self.win = pg.GraphicsLayoutWidget()
         self.win.scene().contextMenu = None  # remove 'Export...'
@@ -78,6 +146,9 @@ class Main(QtWidgets.QWidget):
         self.y_region = pg.LinearRegionItem()
         self.y_region.sigRegionChanged.connect(self.update_y_title)
         self.y_region.setZValue(-10)
+
+        self.x_fit = pg.PlotDataItem(pen='r')
+        self.y_fit = pg.PlotDataItem(pen='r')
 
         self.z_slider = QtWidgets.QSlider(orientation=Qt.Horizontal)
         self.z_slider.setSingleStep(1)
@@ -123,7 +194,7 @@ class Main(QtWidgets.QWidget):
             self.load_data(file)
             self.dropEvent()
 
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
         """Overrides :meth:`QtWidgets.QWidget.dragEnterEvent`."""
         paths = utils.drag_drop_paths(event)
         try:
@@ -135,9 +206,9 @@ class Main(QtWidgets.QWidget):
             self.filename = paths[0]
             event.accept()
 
-    def dropEvent(self, event=None):
+    def dropEvent(self, event: QtGui.QDropEvent = None) -> None:
         """Overrides :meth:`QtWidgets.QWidget.dropEvent`."""
-        if event:
+        if event is not None:
             event.accept()
 
         z_value, array = self.data[self.z_slider.value()]
@@ -196,12 +267,21 @@ class Main(QtWidgets.QWidget):
         self.x_region.blockSignals(False)
         self.y_region.blockSignals(False)
 
-    def on_z_change(self, value):
-        """Handle when the Z slider changes."""
-        self.z_slider.setToolTip(f'Z={self.data[value][0]} mm')
-        self.dropEvent()
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.fit_queue.clear_put(np.empty(0), np.empty(0), '', True)
+        self.fit_thread.stop()
+        super().closeEvent(event)
 
-    def on_roi_changed(self, *ignore): # noqa
+    def on_z_change(self, value: int) -> None:
+        """Handle when the Z slider changes."""
+        self.x_pos = -1
+        self.y_pos = -1
+        self.z_slider.setToolTip(f'Z={self.data[value][0]} mm')
+        self.clear_fit_queue = False
+        self.dropEvent()
+        self.clear_fit_queue = True
+
+    def on_roi_changed(self, *ignore) -> None: # noqa
         """Handle when the RectROI changes."""
         if self.canvas.image is None:
             return
@@ -219,9 +299,9 @@ class Main(QtWidgets.QWidget):
         fm = self.fontMetrics()
         self.roi_label.setFixedSize(fm.horizontalAdvance(html)+8, fm.height())
 
-    def on_mouse_moved(self, event):
+    def on_mouse_moved(self, point: QtCore.QPointF) -> None:
         """Handle a mouse-moved event."""
-        p = self.view_box.mapSceneToView(event)
+        p = self.view_box.mapSceneToView(point)
         if self.filename and self.canvas.image is not None and \
                 (0 <= p.x() < self.canvas.width()) and (0 <= p.y() < self.canvas.height()):
             ix, iy = int(p.x()), int(p.y())
@@ -236,7 +316,7 @@ class Main(QtWidgets.QWidget):
         else:
             self.pos_label.setText('')
 
-    def load_data(self, path):
+    def load_data(self, path: str) -> None:
         self.data.clear()
         if path.endswith('.xml'):
             # KRISS format
@@ -276,67 +356,100 @@ class Main(QtWidgets.QWidget):
                 )
             self.z_slider.setMaximum(len(z_unique)-1)
 
-    def update_x_plot(self):
+    def update_x_plot(self) -> None:
         if self.canvas.image is None:
             return
-        self.xclear()
-        x = self.x_line.getXPos()
-        if 0 <= x < self.canvas.image.shape[0]:
-            self.x_plot.plot(self.y_unique, self.canvas.image[int(x), :])
-            self.x_plot.addItem(self.x_region)
-            self.x_plot.vb.autoRange()
-            self.update_x_title()
 
-    def update_y_plot(self):
-        if self.canvas.image is None:
+        x = int(self.x_line.getXPos())
+        if self.x_pos == x:
             return
-        self.yclear()
-        y = self.y_line.getYPos()
-        if 0 <= y < self.canvas.image.shape[1]:
-            self.y_plot.plot(self.x_unique, self.canvas.image[:, int(y)])
+
+        if 0 <= x < self.canvas.image.shape[0]:
+            self.x_pos = x
+            self.fit_queue.clear_put(self.y_unique, self.canvas.image[x, :],
+                                     'x', self.clear_fit_queue)
+        else:
+            self.xclear()
+
+    @Slot(dict)
+    def plot_x_or_y(self, result: dict) -> None:
+        if result['type'] == 'x':
+            self.xclear()
+            self.x_fit.setData(result['x_fit'], result['y_fit'])
+            self.x_plot.plot(result['x'], result['y'])
+            self.x_plot.addItem(self.x_region)
+            self.x_plot.addItem(self.x_fit)
+            self.x_plot.vb.autoRange()
+            self.fit_params_x = result['params']
+            self.update_x_title()
+        else:
+            self.yclear()
+            self.y_fit.setData(result['x_fit'], result['y_fit'])
+            self.y_plot.plot(result['x'], result['y'])
             self.y_plot.addItem(self.y_region)
+            self.y_plot.addItem(self.y_fit)
             self.y_plot.vb.autoRange()
+            self.fit_params_y = result['params']
             self.update_y_title()
 
-    def xclear(self):
+    def update_y_plot(self) -> None:
+        if self.canvas.image is None:
+            return
+
+        y = int(self.y_line.getYPos())
+        if self.y_pos == y:
+            return
+
+        if 0 <= y < self.canvas.image.shape[1]:
+            self.y_pos = y
+            self.fit_queue.clear_put(self.x_unique, self.canvas.image[:, y],
+                                     'y', self.clear_fit_queue)
+        else:
+            self.yclear()
+
+    def xclear(self) -> None:
         self.x_plot.setTitle('')
         self.x_plot.clear()
 
-    def yclear(self):
+    def yclear(self) -> None:
         self.y_plot.setTitle('')
         self.y_plot.clear()
 
-    def update_x_title(self):
+    def update_x_title(self) -> None:
         if not self.x_plot.dataItems:
             return
 
-        x = self.x_unique[int(self.x_line.getXPos())]
+        mu = self.fit_params_x['mu'].value
+        sigma = self.fit_params_x['sigma'].value
+        x = self.x_unique[self.x_pos]
         y1, y2 = self.x_region.getRegion()
         signal = self.x_plot.dataItems[0].yData
         array = signal[(self.y_unique >= y1) & (self.y_unique <= y2)]
         rsd = f'{std_relative(array):.3%}'
         yc, yd = 0.5*(y1+y2), y2-y1
         self.x_plot.setTitle(
-            f'<html>X={x:.3f}, Y<sub>centre</sub>={yc:.3f}, '
-            f'&Delta;Y={yd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
+            f'<html>X={x:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>&sigma;</sub>={sigma:.3f}, '
+            f'Y<sub>centre</sub>={yc:.3f}, &Delta;Y={yd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
         )
 
-    def update_y_title(self):
+    def update_y_title(self) -> None:
         if not self.y_plot.dataItems:
             return
 
-        y = self.y_unique[int(self.y_line.getYPos())]
+        mu = self.fit_params_y['mu'].value
+        sigma = self.fit_params_y['sigma'].value
+        y = self.y_unique[self.y_pos]
         x1, x2 = self.y_region.getRegion()
         signal = self.y_plot.dataItems[0].yData
         array = signal[(self.x_unique >= x1) & (self.x_unique <= x2)]
         rsd = f'{std_relative(array):.3%}'
         xc, xd = 0.5*(x1+x2), x2-x1
         self.y_plot.setTitle(
-            f'<html>Y={y:.3f}, X<sub>centre</sub>={xc:.3f}, '
-            f'&Delta;X={xd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
+            f'<html>Y={y:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>&sigma;</sub>={sigma:.3f}, '
+            f'X<sub>centre</sub>={xc:.3f}, &Delta;X={xd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
         )
 
-    def save_canvas_as_csv(self):
+    def save_canvas_as_csv(self) -> None:
         if not self.filename:
             prompt.warning('No data to save')
             return
@@ -350,7 +463,7 @@ class Main(QtWidgets.QWidget):
 
         prompt.information(f'Saved image data to\n{filename}')
 
-    def save_as_jpeg(self):
+    def save_as_jpeg(self) -> None:
         if not self.filename:
             prompt.warning('A file has not been loaded yet')
         else:
@@ -358,14 +471,14 @@ class Main(QtWidgets.QWidget):
             self.grab().toImage().save(filename)
             prompt.information(f'Saved image to\n{filename}')
 
-    def save_xplot_as_csv(self):
+    def save_xplot_as_csv(self) -> None:
         if not self.x_plot.items:
             prompt.warning('No data to save')
         else:
             x = re.search(r'X=(\d+\.\d+),', self.x_plot.titleLabel.text).group(1)
             self.save_plot_as_csv('X', x, self.x_plot.items[0].getData())
 
-    def save_yplot_as_csv(self):
+    def save_yplot_as_csv(self) -> None:
         if not self.y_plot.items:
             prompt.warning('No data to save')
         else:
@@ -373,6 +486,7 @@ class Main(QtWidgets.QWidget):
             self.save_plot_as_csv('Y', y, self.y_plot.items[0].getData())
 
     def save_plot_as_csv(self, axis, value, data):
+        print(axis, value, data)
         filename = os.path.splitext(self.filename)[0] + f'_{axis}={value}mm.csv'
         xy = 'X' if axis == 'Y' else 'Y'
         positions, signals = data
@@ -387,7 +501,7 @@ class Main(QtWidgets.QWidget):
 
 class CanvasMenu(QtWidgets.QMenu):
 
-    def __init__(self, parent):
+    def __init__(self, parent: Main) -> None:
         super().__init__(parent)
 
         csv = QtGui.QAction('Save 2D plot as CSV', self)
@@ -401,11 +515,14 @@ class CanvasMenu(QtWidgets.QMenu):
 
 class PlotMenu(QtWidgets.QMenu):
 
-    def __init__(self, parent, csv_callback, plot):
+    def __init__(self,
+                 parent: Main,
+                 csv_callback: Callable[[], None],
+                 plot_item: pg.PlotItem) -> None:
         super().__init__(parent)
 
         reset = QtGui.QAction('Reset view', self)
-        reset.triggered.connect(plot.vb.autoRange)  # noqa: QAction.triggered exists
+        reset.triggered.connect(plot_item.vb.autoRange)  # noqa: QAction.triggered exists
         self.addAction(reset)
 
         self.addSeparator()
