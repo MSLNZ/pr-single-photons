@@ -398,7 +398,7 @@ class SpatialScanWorker(Worker):
 
         self.detector_settings = {}
         if self.is_detector_dmm:
-            self.detector_settings = self.detector.settings()
+            self.detector_settings = self.detector.settings().to_json()
 
         if not parent.is_detector_dmm:
             widget = typing.cast(DAQCounterWidget, parent.detector_widget)
