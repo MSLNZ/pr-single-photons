@@ -159,7 +159,7 @@ class OptoSigmaSHOT702(BaseEquipment):
                 stop moving.
         """
         self.connection.move_absolute(self._wheel, self.degrees_to_position(degrees))
-        self.logger.info(f'{self.alias!r} set to {degrees} degrees')
+        self.logger.info(f'set {self.alias!r} to {degrees} degrees')
         self.angle_changed.emit()
         self._maybe_start_emitting()
         if wait:
@@ -180,7 +180,7 @@ class OptoSigmaSHOT702(BaseEquipment):
             acceleration: The acceleration/deceleration time in ms.
         """
         self.connection.set_speed(self._wheel, minimum, maximum, acceleration)
-        self.logger.info(f'{self.alias!r} set the move speed settings to '
+        self.logger.info(f'set {self.alias!r} move-speed settings to '
                          f'minimum={minimum} PPS, maximum={maximum} PPS, '
                          f'acceleration={acceleration} ms')
 
@@ -199,7 +199,7 @@ class OptoSigmaSHOT702(BaseEquipment):
             acceleration: The acceleration/deceleration time in ms.
         """
         self.connection.set_speed_origin(self._wheel, minimum, maximum, acceleration)
-        self.logger.info(f'{self.alias!r} set the move home speed settings to '
+        self.logger.info(f'set {self.alias!r} move-home speed settings to '
                          f'minimum={minimum} PPS, maximum={maximum} PPS, '
                          f'acceleration={acceleration} ms')
 
