@@ -244,7 +244,7 @@ class Main(QtWidgets.QWidget):
             self.y_region.setRegion((x_ave - dx, x_ave + dx))
 
         i_max = np.argmax(array['signal'])
-        self.max_signal = 1.0  # array['signal'][i_max]
+        self.max_signal = array['signal'][i_max]
         image = np.reshape(array['signal'] / self.max_signal, (self.y_unique.size, self.x_unique.size))
 
         self.canvas.setImage(image.T)
@@ -340,9 +340,9 @@ class Main(QtWidgets.QWidget):
                 scan = root[prompt.item('Select a dataset', items=datasets)]
             else:
                 scan = root[datasets[0]]
-            # dark_mon = (scan.metadata.dark_before.mon_ave + scan.metadata.dark_after.mon_ave) * 0.5
+            dark_mon = (scan.metadata.dark_before.mon_ave + scan.metadata.dark_after.mon_ave) * 0.5
             dark_dut = (scan.metadata.dark_before.dut_ave + scan.metadata.dark_after.dut_ave) * 0.5
-            signal = (scan.dut - dark_dut)  # / (scan.mon - dark_mon)
+            signal = (scan.dut - dark_dut) / (scan.mon - dark_mon)
             x = np.around(scan.x, decimals=3)
             y = np.around(scan.y, decimals=3)
             z = np.around(scan.z, decimals=3)
