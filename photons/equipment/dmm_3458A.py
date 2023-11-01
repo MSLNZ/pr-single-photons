@@ -112,7 +112,7 @@ class Keysight3458A(DMM):
         mode = self.Mode(trigger)
         trig_event = 'AUTO'
         if mode == self.Mode.IMMEDIATE:
-            self._initiate_cmd = f'MEM FIFO;TARM SGL,{ntriggers}'
+            self._initiate_cmd = f'INBUF ON;INBUF OFF;MEM FIFO;TARM SGL,{ntriggers}'
         elif mode == self.Mode.BUS:
             self._initiate_cmd = 'TARM HOLD'
         elif mode == self.Mode.EXTERNAL:
