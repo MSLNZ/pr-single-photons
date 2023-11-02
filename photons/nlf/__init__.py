@@ -34,3 +34,14 @@ class GaussianCDF(Model):
             ('a2', np.mean(x), False, 'mu'),
             ('a3', sigma, False, 'sigma'),
             ('a4', offset, False, 'offset')))
+
+
+class SPADDetectionEfficiency(Model):
+
+    def __init__(self, dll: str | None = None) -> None:
+        super().__init__('(-a1*a2*x)/ln(1-a2*x)', dll=dll)
+
+    def guess(self, x: np.array, y: np.array, *, ideal: float = 0.5, toff: float = 100e-9) -> InputParameters:
+        return InputParameters((
+            ('a1', ideal, False, 'ideal'),
+            ('a2', toff, False, 'toff')))
