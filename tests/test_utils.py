@@ -391,3 +391,20 @@ def test_array_merge():
     assert np.array_equal(merged['abc'], [4., 5., 6.])
     assert np.array_equal(merged['booleans'], [True, False, False])
     assert np.array_equal(merged['f3'], [0, 1, 2])
+
+
+def test_mean_max_n():
+    a = np.arange(1234)
+    np.random.shuffle(a)
+    assert utils.mean_max_n(a, 1) == 1233.
+    assert utils.mean_max_n(a, 2) == sum([1232, 1233]) / 2.0
+    assert utils.mean_max_n(a, 10) == sum([1224, 1225, 1226, 1227, 1228,
+                                           1229, 1230, 1231, 1232, 1233]) / 10.0
+
+
+def test_mean_min_n():
+    a = np.arange(1234)
+    np.random.shuffle(a)
+    assert utils.mean_min_n(a, 1) == 0.0
+    assert utils.mean_min_n(a, 2) == sum([0, 1]) / 2.0
+    assert utils.mean_min_n(a, 10) == sum([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) / 10.0

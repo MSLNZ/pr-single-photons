@@ -279,3 +279,15 @@ def hhmmss(seconds: float) -> str:
     if days == 1:
         return f'{out})'
     return f'{out}s)'
+
+
+def mean_max_n(array: np.ndarray, n: int) -> float:
+    """Return the mean of the maximum *n* values in *array*."""
+    indices = np.argpartition(array, -n)[-n:]
+    return float(np.mean(array[indices]))
+
+
+def mean_min_n(array: np.ndarray, n: int) -> float:
+    """Return the mean of the minimum *n* values in *array*."""
+    indices = np.argpartition(array, n)[:n]
+    return float(np.mean(array[indices]))
