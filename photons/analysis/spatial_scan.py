@@ -28,6 +28,7 @@ from msl.qt import utils
 
 from photons.log import logger
 from photons.nlf import SuperGaussian
+from photons.utils import mean_max_n
 from photons.utils import std_relative
 
 
@@ -89,7 +90,7 @@ class Main(QtWidgets.QWidget):
 
         self.data = {}
         self.filename = file
-        self.max_signal = 1.0
+        self.norm_factor = 1.0
         self.x_unique = np.empty(0)
         self.dx = 0
         self.y_unique = np.empty(0)
@@ -243,9 +244,8 @@ class Main(QtWidgets.QWidget):
             dx = 0.125 * (x_max - x_min)
             self.y_region.setRegion((x_ave - dx, x_ave + dx))
 
-        i_max = np.argmax(array['signal'])
-        self.max_signal = array['signal'][i_max]
-        image = np.reshape(array['signal'] / self.max_signal, (self.y_unique.size, self.x_unique.size))
+        self.norm_factor = mean_max_n(array['normalized'], 25)
+        image = np.reshape(array['normalized'] / self.norm_factor, (self.y_unique.size, self.x_unique.size))
 
         self.canvas.setImage(image.T)
         self.rect_roi.maxBounds = self.canvas.boundingRect()
@@ -253,12 +253,11 @@ class Main(QtWidgets.QWidget):
         self.update_x_plot()
         self.update_y_plot()
 
-        x_max, y_max = array['x'][i_max], array['y'][i_max]
-        if self.max_signal > 1e3:
-            value, si = convert.number_to_si(self.max_signal)
+        if self.norm_factor > 1e3:
+            value, si = convert.number_to_si(self.norm_factor)
         else:
-            value, si = self.max_signal, ''
-        self.max_label.setText(f'Maximum={value:.3f}{si} @ X={x_max:.3f}, Y={y_max:.3f}')
+            value, si = self.norm_factor, ''
+        self.max_label.setText(f'Normalization factor {value:.3f}{si}')
 
         self.setWindowTitle(f'Spatial Scan || {self.filename}')
         self.on_roi_changed()
@@ -306,11 +305,12 @@ class Main(QtWidgets.QWidget):
                 (0 <= p.x() < self.canvas.width()) and (0 <= p.y() < self.canvas.height()):
             ix, iy = int(p.x()), int(p.y())
             try:
+                z, arrays = self.data[self.z_slider.value()]
                 x = self.x_unique[ix]
                 y = self.y_unique[iy]
-                z = self.data[self.z_slider.value()][0]
                 v = self.canvas.image[ix, iy]
-                self.pos_label.setText(f'({x:.3f}, {y:.3f}, {z:.3f}) = {v:.6f}')
+                d = arrays['dut'][ix + len(self.y_unique)*iy]
+                self.pos_label.setText(f'({x:.3f}, {y:.3f}, {z:.3f}) = {v:.6f} [DUT {d:.1f}]')
             except IndexError:
                 self.pos_label.setText('')
         else:
@@ -326,7 +326,7 @@ class Main(QtWidgets.QWidget):
             data = [tuple(val.text for val in element.findall(f'.//{urn}Cell/{urn}Data'))
                     for element in table if element.tag.endswith('Row')]
             dtype = [('timestamp', 'S23'), ('x', '<f8'), ('y', '<f8'),
-                     ('signal', '<f8'), ('std', '<f8'), ('navg', '<f8')]
+                     ('normalized', '<f8'), ('std', '<f8'), ('navg', '<f8')]
             # each Z position is in a separate file, so read the value from the filename
             found = re.search(r'at(?P<z>[\d.]+)', path)
             z = 0 if found is None else float(found['z'])
@@ -342,7 +342,7 @@ class Main(QtWidgets.QWidget):
                 scan = root[datasets[0]]
             dark_mon = (scan.metadata.dark_before.mon_ave + scan.metadata.dark_after.mon_ave) * 0.5
             dark_dut = (scan.metadata.dark_before.dut_ave + scan.metadata.dark_after.dut_ave) * 0.5
-            signal = (scan.dut - dark_dut) / (scan.mon - dark_mon)
+            normalized = (scan.dut - dark_dut) / (scan.mon - dark_mon)
             x = np.around(scan.x, decimals=3)
             y = np.around(scan.y, decimals=3)
             z = np.around(scan.z, decimals=3)
@@ -351,8 +351,8 @@ class Main(QtWidgets.QWidget):
                 indices = z == z_val
                 self.data[i] = (
                     z_val, np.asarray(
-                        [items for items in zip(x[indices], y[indices], signal[indices])],
-                        dtype=[('x', '<f8'), ('y', '<f8'), ('signal', '<f8')])
+                        [items for items in zip(x[indices], y[indices], normalized[indices], scan.dut[indices])],
+                        dtype=[('x', '<f8'), ('y', '<f8'), ('normalized', '<f8'), ('dut', '<f8')])
                 )
             self.z_slider.setMaximum(len(z_unique)-1)
 
@@ -456,7 +456,7 @@ class Main(QtWidgets.QWidget):
 
         filename = os.path.splitext(self.filename)[0] + '.csv'
         with open(filename, mode='wt') as fp:
-            fp.write(f'scale factor,{self.max_signal}\n')
+            fp.write(f'scale factor,{self.norm_factor}\n')
             fp.write('X/Y,' + ','.join(f'{x:.3f}' for x in self.x_unique) + '\n')
             for y, row in zip(self.y_unique, self.canvas.image.T):
                 fp.write(f'{y:.3f},' + ','.join(f'{v:.6f}' for v in row) + '\n')
@@ -490,7 +490,7 @@ class Main(QtWidgets.QWidget):
         xy = 'X' if axis == 'Y' else 'Y'
         positions, signals = data
         with open(filename, mode='wt') as fp:
-            fp.write(f'scale factor,{self.max_signal}\n')
+            fp.write(f'scale factor,{self.norm_factor}\n')
             fp.write(f'{axis}[mm],{value}\n')
             fp.write(f'{xy}[mm],normalized\n')
             for p, s in zip(positions, signals):
