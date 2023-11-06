@@ -4,9 +4,7 @@ Non-linear fit models.
 import os
 
 import numpy as np
-from msl.nlf import InputParameters
-from msl.nlf import Model
-from msl.nlf.models import *  # noqa
+from msl.nlf import *
 
 USER_DIR = os.path.join(os.path.dirname(__file__), 'user')
 
