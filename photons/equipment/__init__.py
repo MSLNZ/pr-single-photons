@@ -22,4 +22,5 @@ from .shutter_s25120a import S25120AShutter
 from .sia_cmi import SIA3CMI
 from .thorlabs_flipper import ThorlabsFlipper
 from .thorlabs_stage import ThorlabsStage
+from .thorlabs_wheel import ThorlabsWheel
 from .widgets import *

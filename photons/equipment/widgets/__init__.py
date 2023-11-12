@@ -11,3 +11,4 @@ from .shutter import ShutterWidget
 from .sia_cmi import SIA3CMIWidget
 from .thorlabs_flipper import ThorlabsFlipperWidget
 from .thorlabs_stage import ThorlabsStageWidget
+from .thorlabs_wheel import ThorlabsWheelWidget
