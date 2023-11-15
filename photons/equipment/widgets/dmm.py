@@ -31,11 +31,11 @@ from ...samples import Samples
 
 class FetchWorker(Worker):
 
-    def __init__(self, connection: DMM, trigger_mode: str) -> None:
+    def __init__(self, connection: DMM, trigger_mode: Mode) -> None:
         """Fetch samples from the DMM in a worker thread."""
         super().__init__()
         self.connection = connection
-        self.send_trigger = trigger_mode == 'BUS'
+        self.send_trigger = trigger_mode == Mode.BUS
 
     def process(self):
         """Fetch the samples from the DMM."""
