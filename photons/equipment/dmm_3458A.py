@@ -2,6 +2,7 @@
 Keysight 3458A digital multimeter.
 """
 import warnings
+from time import sleep
 
 from msl.equipment import EquipmentRecord
 from msl.equipment.constants import Interface
@@ -112,7 +113,7 @@ class Keysight3458A(DMM):
         mode = self.Mode(trigger)
         trig_event = 'AUTO'
         if mode == self.Mode.IMMEDIATE:
-            self._initiate_cmd = f'INBUF ON;INBUF OFF;MEM FIFO;TARM SGL,{ntriggers}'
+            self._initiate_cmd = f'MEM FIFO;TARM SGL,{ntriggers};MEM OFF'
         elif mode == self.Mode.BUS:
             self._initiate_cmd = 'TARM HOLD'
         elif mode == self.Mode.EXTERNAL:
@@ -127,20 +128,23 @@ class Keysight3458A(DMM):
                                   stacklevel=2)
 
             self._initiate_cmd = f'MEM FIFO;TARM SGL,{ntriggers};MEM OFF'
-            if self._gpib:
-                # Turning the INBUF ON/OFF is required because the GPIB write()
-                # method waits for the count() return value. Therefore, when
-                # self.initiate() is called, it blocks until a timeout error is
-                # raised or until count() receives a return value.
-                #
-                # Used the NI GPIB-USB-HS+ adapter to communicate with the DMM
-                # to determine this caveat.
-                self._initiate_cmd = 'INBUF ON;INBUF OFF;' + self._initiate_cmd
-            elif self._prologix:
+            if self._prologix:
                 warnings.warn(f'Trigger {mode} is not reliable when using '
                               f'the Prologix GPIB-ENET adapter. May get a '
                               f'ConnectionResetError.',
                               stacklevel=2)
+
+        if self._gpib:
+            # Turning the INBUF ON/OFF is required because the GPIB write()
+            # method waits for the count() return value. Therefore, when
+            # self.initiate() or self.trigger() is called, it blocks until a
+            # timeout error is raised or until count() receives a return value.
+            #
+            # Used the NI GPIB-USB-HS+ adapter to communicate with the DMM
+            # to determine this caveat.
+            buff = 'INBUF ON;INBUF OFF;'
+            self._initiate_cmd = buff + self._initiate_cmd
+            self._trigger_cmd = buff + self._trigger_cmd
 
         self._trigger_mode = mode
 
@@ -171,6 +175,22 @@ class Keysight3458A(DMM):
         if initiate:
             self.initiate()
         self.logger.info(f'fetch {self.alias!r}')
+
+        if self._gpib:
+            while True:
+                try:
+                    # From the "Using the Input Buffer" section of the manual (page 75):
+                    #   When using the input buffer, it may be necessary to know when all
+                    #   buffered commands have been executed. The multimeter provides this
+                    #   information by setting bit 4 (0b00010000 = 16) in the status register
+                    val = self.connection.serial_poll()  # noqa: ConnectionGPIB has serial_poll()
+                    if val & 16:
+                        break
+                except TypeError:  # serial_poll() received an empty reply
+                    pass
+                else:
+                    sleep(0.1)
+
         # From the RMEM documentation on page 230 of manual:
         #   The multimeter assigns a number to each reading in reading memory. The most
         #   recent reading is assigned the lowest number (1) and the oldest reading has the
