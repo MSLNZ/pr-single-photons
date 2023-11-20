@@ -27,6 +27,7 @@ from msl.qt import prompt
 from msl.qt import utils
 
 from photons.log import logger
+from photons.nlf import GaussianCDF
 from photons.nlf import SuperGaussian
 from photons.utils import mean_max_n
 from photons.utils import std_relative
@@ -49,6 +50,7 @@ class FitWorker(Worker):
         super().__init__()
         self.queue: Queue = queue
         self.super_gaussian = SuperGaussian()
+        self.gaussian_cdf = GaussianCDF()
 
     def process(self) -> None:
         while True:
@@ -56,19 +58,34 @@ class FitWorker(Worker):
             if x.size == 0:
                 break
             try:
-                result = self.super_gaussian.fit(x, y)
+                result_sg = self.super_gaussian.fit(x, y)
             except OSError as e:
                 logger.warning(e)
                 continue
-            x_fit = np.linspace(x[0], x[-1], num=100)
-            y_fit = self.super_gaussian.evaluate(x_fit, result)
+
+            try:
+                indices = x < result_sg.params['mu'].value
+                x_cdf = x[indices]
+                result_cdf = self.gaussian_cdf.fit(x_cdf, y[indices])
+            except OSError as e:
+                logger.warning(e)
+                continue
+
+            x_fit_sg = np.linspace(x[0], x[-1], num=100)
+            y_fit_sg = self.super_gaussian.evaluate(x_fit_sg, result_sg)
+            x_fit_cdf = np.linspace(x_cdf[0], x_cdf[-1], num=100)
+            y_fit_cdf = self.gaussian_cdf.evaluate(x_fit_cdf, result_cdf)
+
             self.result.emit({
                 'type': typ,
                 'x': x,
                 'y': y,
-                'x_fit': x_fit,
-                'y_fit': y_fit,
-                'params': result.params
+                'x_fit_sg': x_fit_sg,
+                'y_fit_sg': y_fit_sg,
+                'params_sg': result_sg.params,
+                'x_fit_cdf': x_fit_cdf,
+                'y_fit_cdf': y_fit_cdf,
+                'params_cdf': result_cdf.params,
             })
 
 
@@ -148,8 +165,10 @@ class Main(QtWidgets.QWidget):
         self.y_region.sigRegionChanged.connect(self.update_y_title)
         self.y_region.setZValue(-10)
 
-        self.x_fit = pg.PlotDataItem(pen='r')
-        self.y_fit = pg.PlotDataItem(pen='r')
+        self.x_fit_sg = pg.PlotDataItem(pen='r')
+        self.y_fit_sg = pg.PlotDataItem(pen='r')
+        self.x_fit_cdf = pg.PlotDataItem(pen='b')
+        self.y_fit_cdf = pg.PlotDataItem(pen='b')
 
         self.z_slider = QtWidgets.QSlider(orientation=Qt.Horizontal)
         self.z_slider.setSingleStep(1)
@@ -375,21 +394,27 @@ class Main(QtWidgets.QWidget):
     def plot_x_or_y(self, result: dict) -> None:
         if result['type'] == 'x':
             self.xclear()
-            self.x_fit.setData(result['x_fit'], result['y_fit'])
+            self.x_fit_sg.setData(result['x_fit_sg'], result['y_fit_sg'])
+            self.x_fit_cdf.setData(result['x_fit_cdf'], result['y_fit_cdf'])
             self.x_plot.plot(result['x'], result['y'])
             self.x_plot.addItem(self.x_region)
-            self.x_plot.addItem(self.x_fit)
+            self.x_plot.addItem(self.x_fit_sg)
+            self.x_plot.addItem(self.x_fit_cdf)
             self.x_plot.vb.autoRange()
-            self.fit_params_x = result['params']
+            self.fit_params_x = {'mu': result['params_sg']['mu'].value,
+                                 'diameter': 4*result['params_cdf']['sigma'].value}
             self.update_x_title()
         else:
             self.yclear()
-            self.y_fit.setData(result['x_fit'], result['y_fit'])
+            self.y_fit_sg.setData(result['x_fit_sg'], result['y_fit_sg'])
+            self.y_fit_cdf.setData(result['x_fit_cdf'], result['y_fit_cdf'])
             self.y_plot.plot(result['x'], result['y'])
             self.y_plot.addItem(self.y_region)
-            self.y_plot.addItem(self.y_fit)
+            self.y_plot.addItem(self.y_fit_sg)
+            self.y_plot.addItem(self.y_fit_cdf)
             self.y_plot.vb.autoRange()
-            self.fit_params_y = result['params']
+            self.fit_params_y = {'mu': result['params_sg']['mu'].value,
+                                 'diameter': 4*result['params_cdf']['sigma'].value}
             self.update_y_title()
 
     def update_y_plot(self) -> None:
@@ -419,8 +444,8 @@ class Main(QtWidgets.QWidget):
         if not self.x_plot.dataItems:
             return
 
-        mu = self.fit_params_x['mu'].value
-        sigma = self.fit_params_x['sigma'].value
+        mu = self.fit_params_x['mu']
+        diameter = self.fit_params_x['diameter']
         x = self.x_unique[self.x_pos]
         y1, y2 = self.x_region.getRegion()
         signal = self.x_plot.dataItems[0].yData
@@ -428,7 +453,7 @@ class Main(QtWidgets.QWidget):
         rsd = f'{std_relative(array):.3%}'
         yc, yd = 0.5*(y1+y2), y2-y1
         self.x_plot.setTitle(
-            f'<html>X={x:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>&sigma;</sub>={sigma:.3f}, '
+            f'<html>X={x:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>Diameter</sub>={diameter:.3f}, '
             f'Y<sub>centre</sub>={yc:.3f}, &Delta;Y={yd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
         )
 
@@ -436,8 +461,8 @@ class Main(QtWidgets.QWidget):
         if not self.y_plot.dataItems:
             return
 
-        mu = self.fit_params_y['mu'].value
-        sigma = self.fit_params_y['sigma'].value
+        mu = self.fit_params_y['mu']
+        diameter = self.fit_params_y['diameter']
         y = self.y_unique[self.y_pos]
         x1, x2 = self.y_region.getRegion()
         signal = self.y_plot.dataItems[0].yData
@@ -445,7 +470,7 @@ class Main(QtWidgets.QWidget):
         rsd = f'{std_relative(array):.3%}'
         xc, xd = 0.5*(x1+x2), x2-x1
         self.y_plot.setTitle(
-            f'<html>Y={y:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>&sigma;</sub>={sigma:.3f}, '
+            f'<html>Y={y:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>Diameter</sub>={diameter:.3f}, '
             f'X<sub>centre</sub>={xc:.3f}, &Delta;X={xd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
         )
 
