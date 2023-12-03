@@ -13,6 +13,8 @@ except ImportError:
 
 import numpy as np
 
+from .log import logger
+
 
 def _freq(i, j):
     return 440 * (2 ** ((i + (j * 12) - 57) / 12))
@@ -128,7 +130,10 @@ class Song:
                     # convert to (little-endian) 16-bit integer
                     audio = (frame * (2 ** 15 - 1)).astype('<h')
                     w.writeframes(audio.tobytes())
-            winsound.PlaySound(buffer.getvalue(), winsound.SND_MEMORY)
+            try:
+                winsound.PlaySound(buffer.getvalue(), winsound.SND_MEMORY)
+            except RuntimeError as e:
+                logger.error(e)
 
 
 def play(wav: str | Theme, wait: bool = True) -> None:
