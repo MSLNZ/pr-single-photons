@@ -11,13 +11,17 @@ from xml.etree.ElementTree import ElementTree
 import numpy as np
 import pyqtgraph as pg
 from msl.io import read
-from msl.qt import LineEdit
+from msl.qt import Button
+from msl.qt import CheckBox
+from msl.qt import ComboBox
+from msl.qt import DoubleSpinBox
 from msl.qt import Qt
 from msl.qt import QtCore
 from msl.qt import QtGui
 from msl.qt import QtWidgets
 from msl.qt import Signal
 from msl.qt import Slot
+from msl.qt import SpinBox
 from msl.qt import Thread
 from msl.qt import Worker
 from msl.qt import application
@@ -109,13 +113,16 @@ class Main(QtWidgets.QWidget):
         self.filename = file
         self.norm_factor = 1.0
         self.x_unique = np.empty(0)
-        self.dx = 0
+        self.dx = 0.0
         self.y_unique = np.empty(0)
-        self.dy = 0
+        self.dy = 0.0
         self.z_value = None
         self.x_pos = -1
         self.y_pos = -1
+        self.ix = 0
+        self.iy = 0
         self.clear_fit_queue = True
+        self.roi_colour = QtGui.QColor(Qt.GlobalColor.red)
 
         self.fit_params_x = None
         self.fit_params_y = None
@@ -124,15 +131,15 @@ class Main(QtWidgets.QWidget):
         self.fit_thread.start(self.fit_queue)
         self.fit_thread.worker_connect(FitWorker.result, self.plot_x_or_y)
 
-        self.win = pg.GraphicsLayoutWidget()
-        self.win.scene().contextMenu = None  # remove 'Export...'
+        self.image_widget = pg.GraphicsLayoutWidget()
 
-        self.view_box = pg.ViewBox(border='w', invertY=True, lockAspect=True, enableMouse=False)
+        self.view_box = pg.ViewBox(border='w', invertY=True, lockAspect=True, enableMouse=True)
         self.canvas = pg.ImageItem()
         self.view_box.addItem(self.canvas)
         self.view_box.menu = CanvasMenu(self)
-        self.win.addItem(self.view_box, row=0, col=0, rowspan=2)  # noqa: row, col, rowspan are valid kwargs
+        self.image_widget.addItem(self.view_box)
         self.view_box.scene().sigMouseMoved.connect(self.on_mouse_moved)
+        self.view_box.state['wheelScaleFactor'] = -0.075
 
         self.x_line = pg.InfiniteLine(angle=90, movable=True)
         self.x_line.sigPositionChanged.connect(self.update_x_plot)
@@ -142,17 +149,13 @@ class Main(QtWidgets.QWidget):
         self.y_line.sigPositionChanged.connect(self.update_y_plot)
         self.view_box.addItem(self.y_line)
 
-        self.rect_roi = pg.RectROI((0, 0), (1, 1), pen='r', maxBounds=self.canvas.boundingRect(),
-                                   scaleSnap=True, translateSnap=True, invertible=True)
-        self.rect_roi.sigRegionChanged.connect(self.on_roi_changed)
-        self.view_box.addItem(self.rect_roi)
-
-        self.x_plot = self.win.addPlot(row=0, col=1)
+        self.plot_widgets = pg.GraphicsLayoutWidget()
+        self.x_plot = self.plot_widgets.addPlot(row=0, col=0)
         self.x_plot.ctrlMenu = None  # remove 'Plot Options'
         self.x_plot.vb.menu = PlotMenu(self, self.save_xplot_as_csv, self.x_plot)
         self.x_plot.showGrid(x=True, y=True)
 
-        self.y_plot = self.win.addPlot(row=1, col=1)
+        self.y_plot = self.plot_widgets.addPlot(row=1, col=0)
         self.y_plot.ctrlMenu = None  # remove 'Plot Options'
         self.y_plot.vb.menu = PlotMenu(self, self.save_yplot_as_csv, self.y_plot)
         self.y_plot.showGrid(x=True, y=True)
@@ -177,37 +180,39 @@ class Main(QtWidgets.QWidget):
         self.canvas_lut = pg.HistogramLUTWidget()
         self.canvas_lut.setImageItem(self.canvas)
         self.canvas_lut.gradient.loadPreset('flame')
-        self.canvas_lut.vb.menu = QtWidgets.QMenu()  # clear the Menu
+        self.canvas_lut.vb.menu = LUTMenu(self)
         self.canvas_lut.scene().contextMenu = None  # remove 'Export...'
 
         self.max_label = QtWidgets.QLabel(self)
         self.max_label.setStyleSheet('color: white;')
         self.pos_label = QtWidgets.QLabel(self)
         self.pos_label.setStyleSheet('color: white;')
-        self.roi_label = LineEdit(
-            read_only=True,
-            parent=self,
-        )
+        self.roi_label = QtWidgets.QLabel(self)
         self.roi_label.setStyleSheet('color: white; background: black; border: 1px')
 
+        self.image_widgets = QtWidgets.QWidget()
         hbox = QtWidgets.QHBoxLayout()
         hbox.addWidget(self.canvas_lut)
-        hbox.addWidget(self.win)
+        hbox.addWidget(self.image_widget)
+        self.image_widgets.setLayout(hbox)
+
+        splitter = QtWidgets.QSplitter(Qt.Horizontal)
+        splitter.addWidget(self.image_widgets)
+        splitter.addWidget(self.plot_widgets)
 
         vbox = QtWidgets.QVBoxLayout()
-        vbox.addLayout(hbox)
+        vbox.addWidget(splitter)
         vbox.addWidget(self.z_slider)
 
         label_layout = QtWidgets.QHBoxLayout()
         label_layout.addWidget(self.max_label)
-        label_layout.addStretch(1)
         label_layout.addWidget(self.pos_label)
         label_layout.addStretch(1)
         label_layout.addWidget(self.roi_label)
 
         layout = QtWidgets.QVBoxLayout()
         layout.addLayout(label_layout)
-        layout.addLayout(vbox)
+        layout.addLayout(vbox, stretch=1)
         self.setLayout(layout)
 
         if file:
@@ -267,7 +272,11 @@ class Main(QtWidgets.QWidget):
         image = np.reshape(array['normalized'] / self.norm_factor, (self.y_unique.size, self.x_unique.size))
 
         self.canvas.setImage(image.T)
-        self.rect_roi.maxBounds = self.canvas.boundingRect()
+
+        for item in self.view_box.addedItems:
+            if isinstance(item, pg.ROI):
+                self.update_roi_data(item)
+        self.roi_label.setText('')
 
         self.update_x_plot()
         self.update_y_plot()
@@ -279,7 +288,6 @@ class Main(QtWidgets.QWidget):
         self.max_label.setText(f'Normalization factor {value:.3f}{si}')
 
         self.setWindowTitle(f'Spatial Scan || {self.filename}')
-        self.on_roi_changed()
 
         # re-enable the signals since the x and y plots now have the updated data
         self.x_region.blockSignals(False)
@@ -288,6 +296,9 @@ class Main(QtWidgets.QWidget):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.fit_queue.clear_put(np.empty(0), np.empty(0), '', True)
         self.fit_thread.stop()
+        exporters = [w for w in application().allWidgets() if w.windowTitle() == 'Export']
+        for e in exporters:
+            e.close()
         super().closeEvent(event)
 
     def on_z_change(self, value: int) -> None:
@@ -299,20 +310,38 @@ class Main(QtWidgets.QWidget):
         self.dropEvent()
         self.clear_fit_queue = True
 
-    def on_roi_changed(self, *ignore) -> None: # noqa
-        """Handle when the RectROI changes."""
+    def update_roi_data(self, roi: pg.ROI) -> None:
+        """Handle when a ROI changes."""
         if self.canvas.image is None:
             return
-        array = self.rect_roi.getArrayRegion(self.canvas.image, self.canvas)
-        rsd = f'{std_relative(array.flatten()):.3%}'
-        diff = np.amax(array) - np.amin(array)
-        width, height = array.shape
-        mm_x = self.dx * width
-        mm_y = self.dy * height
-        html = f'ROI {mm_x:g} x {mm_y:g} mm, &sigma;<sub>rel</sub>={rsd}, max-min={diff}'
-        text = QtGui.QTextDocument()
-        text.setHtml(html)
-        self.roi_label.setText(text.toPlainText())
+
+        state = roi.getState()
+        x1, x2 = round(state['pos'].x()), round(state['pos'].x() + state['size'].x())
+        y1, y2 = round(state['pos'].y()), round(state['pos'].y() + state['size'].y())
+        x = self.x_unique[(x1 + x2) // 2]
+        y = self.y_unique[(y1 + y2) // 2]
+        # region = self.canvas.image[x1:x2, y1:y2]
+        region = roi.getArrayRegion(self.canvas.image, self.canvas)
+        if isinstance(roi, pg.CircleROI):
+            region = region[region != 0]
+        rsd = f'{std_relative(region):.3%}'
+        if region.size > 0:
+            diff = np.max(region) - np.min(region)
+        else:
+            diff = 0.0
+
+        if isinstance(roi, pg.RectROI):
+            mm_x = self.dx * state['size'].x()
+            mm_y = self.dy * state['size'].y()
+            html = (f'ROI, x={x:.3f}, y={y:.3f}, {mm_x:.3f} x {mm_y:.3f} mm, '
+                    f'&sigma;<sub>rel</sub>={rsd}, max-min={diff:.3f}')
+        else:
+            diam = state['size'].x() * self.dx
+            html = (f'ROI, x={x:.3f}, y={y:.3f}, \u2300={diam:.3f} mm, '
+                    f'&sigma;<sub>rel</sub>={rsd}, max-min={diff:.3f}')
+
+        roi.setToolTip(html.replace(',', '<br/>'))
+        self.roi_label.setText(html)
         self.roi_label.adjustSize()
         fm = self.fontMetrics()
         self.roi_label.setFixedSize(fm.horizontalAdvance(html)+8, fm.height())
@@ -322,13 +351,13 @@ class Main(QtWidgets.QWidget):
         p = self.view_box.mapSceneToView(point)
         if self.filename and self.canvas.image is not None and \
                 (0 <= p.x() < self.canvas.width()) and (0 <= p.y() < self.canvas.height()):
-            ix, iy = int(p.x()), int(p.y())
+            self.ix, self.iy = int(p.x()), int(p.y())
             try:
                 z, arrays = self.data[self.z_slider.value()]
-                x = self.x_unique[ix]
-                y = self.y_unique[iy]
-                v = self.canvas.image[ix, iy]
-                d = arrays['dut'][ix + len(self.y_unique)*iy]
+                x = self.x_unique[self.ix]
+                y = self.y_unique[self.iy]
+                v = self.canvas.image[self.ix, self.iy]
+                d = arrays['dut'][self.ix + len(self.y_unique)*self.iy]
                 self.pos_label.setText(f'({x:.3f}, {y:.3f}, {z:.3f}) = {v:.6f} [DUT {d:.1f}]')
             except IndexError:
                 self.pos_label.setText('')
@@ -453,7 +482,7 @@ class Main(QtWidgets.QWidget):
         rsd = f'{std_relative(array):.3%}'
         yc, yd = 0.5*(y1+y2), y2-y1
         self.x_plot.setTitle(
-            f'<html>X={x:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>Diameter</sub>={diameter:.3f}, '
+            f'<html>X={x:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>\u00F8</sub>={diameter:.3f}, '
             f'Y<sub>centre</sub>={yc:.3f}, &Delta;Y={yd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
         )
 
@@ -470,7 +499,7 @@ class Main(QtWidgets.QWidget):
         rsd = f'{std_relative(array):.3%}'
         xc, xd = 0.5*(x1+x2), x2-x1
         self.y_plot.setTitle(
-            f'<html>Y={y:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>Diameter</sub>={diameter:.3f}, '
+            f'<html>Y={y:.3f}, Fit<sub>&mu;</sub>={mu:.3f}, Fit<sub>\u00F8</sub>={diameter:.3f}, '
             f'X<sub>centre</sub>={xc:.3f}, &Delta;X={xd:.3f}, &sigma;<sub>rel</sub>={rsd}</html>'
         )
 
@@ -522,11 +551,80 @@ class Main(QtWidgets.QWidget):
                 fp.write(f'{p},{s}\n')
         prompt.information(f'Saved data to\n{filename}')
 
+    def prompt_add_roi(self) -> None:
+        if self.canvas.image is None:
+            prompt.warning('Cannot add a ROI to an empty image')
+            return
+
+        dialog = ROIDialog(self)
+        if not dialog.exec():
+            return
+
+        size = (dialog.diameter.value() * 1e-3) / self.dx
+        if dialog.scale_snap.isChecked():
+            size = round(size)
+
+        pos_x = (dialog.x.value() - dialog.x.minimum()) / (dialog.x.maximum() - dialog.x.minimum()) * len(self.x_unique)
+        pos_x -= size / 2
+        pos_y = (dialog.y.value() - dialog.y.minimum()) / (dialog.y.maximum() - dialog.y.minimum()) * len(self.y_unique)
+        pos_y -= size / 2
+
+        if dialog.translate_snap.isChecked():
+            pos_x = round(pos_x)
+            pos_y = round(pos_y)
+
+        pen = QtGui.QPen(self.roi_colour)
+        pen.setWidthF(dialog.pen_width.value())
+        hover_pen = QtGui.QPen(self.roi_colour)
+        hover_pen.setWidthF(pen.widthF()/2)
+
+        cls = pg.CircleROI if dialog.shape.currentText() == 'Circle' else pg.RectROI
+        roi = cls((pos_x, pos_y), (size, size),
+                  pen=pen, hoverPen=hover_pen, removable=True, invertible=False,
+                  translateSnap=dialog.translate_snap.isChecked(),
+                  scaleSnap=dialog.scale_snap.isChecked(),
+                  maxBounds=self.canvas.boundingRect())
+        roi.sigRemoveRequested.connect(self.remove_roi)
+        roi.sigRegionChanged.connect(self.update_roi_data)
+        self.view_box.addItem(roi)
+        self.update_roi_data(roi)
+
+    def remove_roi(self, roi: pg.ROI) -> None:
+        for item in self.view_box.addedItems:
+            if roi is item:
+                self.view_box.removeItem(item)
+                self.roi_label.setText('')
+                return
+
+    def reset_lut_levels(self) -> None:
+        if self.canvas.image is None:
+            mn, mx = 0, 1
+        else:
+            mn = np.min(self.canvas.image)
+            mx = np.max(self.canvas.image)
+        self.canvas_lut.item.setLevels(mn, mx)
+
+    def set_lut_levels(self) -> None:
+        dialog = LUTLevelDialog(self)
+        if not dialog.exec():
+            return
+        self.canvas_lut.setLevels(dialog.min.value(), dialog.max.value())
+
 
 class CanvasMenu(QtWidgets.QMenu):
 
     def __init__(self, parent: Main) -> None:
         super().__init__(parent)
+
+        roi = QtGui.QAction('Add ROI', self)
+        roi.triggered.connect(parent.prompt_add_roi)  # noqa: QAction.triggered exists
+        self.addAction(roi)
+
+        reset = QtGui.QAction('Reset view', self)
+        reset.triggered.connect(parent.view_box.autoRange)  # noqa: QAction.triggered exists
+        self.addAction(reset)
+
+        self.addSeparator()
 
         csv = QtGui.QAction('Save 2D plot as CSV', self)
         csv.triggered.connect(parent.save_canvas_as_csv)  # noqa: QAction.triggered exists
@@ -558,6 +656,121 @@ class PlotMenu(QtWidgets.QMenu):
         jpeg = QtGui.QAction('Save Window as JPEG', self)
         jpeg.triggered.connect(parent.save_as_jpeg)  # noqa: QAction.triggered exists
         self.addAction(jpeg)
+
+
+class LUTMenu(QtWidgets.QMenu):
+
+    def __init__(self, parent: Main) -> None:
+        super().__init__(parent)
+
+        reset = QtGui.QAction('Reset Levels', self)
+        reset.triggered.connect(parent.reset_lut_levels)  # noqa: QAction.triggered exists
+        self.addAction(reset)
+
+        reset = QtGui.QAction('Set Levels', self)
+        reset.triggered.connect(parent.set_lut_levels)  # noqa: QAction.triggered exists
+        self.addAction(reset)
+
+
+class ROIDialog(QtWidgets.QDialog):
+
+    def __init__(self, parent: Main) -> None:
+        super().__init__()
+
+        def get_color():
+            c = QtWidgets.QColorDialog.getColor(parent.roi_colour)
+            if c.isValid():
+                parent.roi_colour = c
+                colour.setStyleSheet(f'background-color: {c.name()}; border: none;')
+
+        self.setWindowTitle('Add ROI')
+
+        btn = QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        button_box = QtWidgets.QDialogButtonBox(btn)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+
+        layout = QtWidgets.QFormLayout()
+        self.shape = ComboBox(items=['Circle', 'Rectangle'])
+
+        self.scale_snap = CheckBox(initial=False)
+        self.translate_snap = CheckBox(initial=True)
+
+        self.x = DoubleSpinBox(
+            value=parent.x_unique[parent.ix],
+            minimum=parent.x_unique[0],
+            maximum=parent.x_unique[-1],
+            step=0.01,
+            decimals=3,
+        )
+        self.y = DoubleSpinBox(
+            value=parent.y_unique[parent.iy],
+            minimum=parent.y_unique[0],
+            maximum=parent.y_unique[-1],
+            step=0.01,
+            decimals=3,
+        )
+        self.diameter = SpinBox(value=25, minimum=1, maximum=10000)
+        colour = Button(left_click=get_color)
+        colour.setStyleSheet(f'background-color: {parent.roi_colour.name()}; border: none;')
+
+        self.pen_width = DoubleSpinBox(value=0.02)
+
+        layout.addRow('ROI', self.shape)
+        layout.addRow('Diameter/Width [um]', self.diameter)
+        layout.addRow('Colour', colour)
+        layout.addRow('Pen Width', self.pen_width)
+        layout.addRow('Translate Snap', self.translate_snap)
+        layout.addRow('Scale Snap', self.scale_snap)
+        layout.addRow('X', self.x)
+        layout.addRow('Y', self.y)
+        layout.addWidget(button_box)
+        self.setLayout(layout)
+
+
+class LUTLevelDialog(QtWidgets.QDialog):
+
+    def __init__(self, parent: Main) -> None:
+        super().__init__()
+
+        self.setWindowTitle('Set LUT Levels')
+
+        btn = QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        button_box = QtWidgets.QDialogButtonBox(btn)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+
+        current_mn, current_mx = parent.canvas_lut.item.getLevels()
+
+        if parent.canvas.image is None:
+            mn, mx = 0, 1
+        else:
+            mn = np.min(parent.canvas.image)
+            mx = np.max(parent.canvas.image)
+
+        decimals = 6
+        step = round((mx-mn) * 0.05, decimals)
+
+        layout = QtWidgets.QFormLayout()
+        self.min = DoubleSpinBox(
+            value=current_mn,
+            minimum=mn,
+            maximum=mx,
+            step=step,
+            decimals=decimals,
+        )
+        self.max = DoubleSpinBox(
+            value=current_mx,
+            minimum=mn,
+            maximum=mx,
+            step=step,
+            decimals=decimals,
+        )
+
+        layout.addRow('Minimum', self.min)
+        layout.addRow('Maximum', self.max)
+        layout.addWidget(button_box)
+        self.setLayout(layout)
 
 
 if __name__ == '__main__':
