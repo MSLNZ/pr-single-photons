@@ -814,7 +814,7 @@ class NIDAQ(BaseEquipment):
               delay: float = 0,
               npulses: int = 1,
               state: bool = True,
-              timeout: float = 10,
+              timeout: float = -1,
               wait: bool = True) -> Task:
         """Generate one (or more) digital pulse(s).
 
