@@ -356,14 +356,14 @@ def test_array_merge():
 
     x = np.arange(5)
     merged = utils.array_merge(x)
-    expected = np.array([(0,), (1,), (2,), (3,), (4,)], dtype=[('f0', '<i4')])
+    expected = np.array([(0,), (1,), (2,), (3,), (4,)], dtype=[('f0', '<i8')])
     assert np.array_equal(merged, expected)
     assert merged.dtype == expected.dtype
     assert np.array_equal(merged['f0'], [0, 1, 2, 3, 4])
 
     x = np.arange(3)
     merged = utils.array_merge(x, y)
-    expected = np.array([(0, 0), (1, 1), (2, 2)], dtype=[('f0', '<i4'), ('f1', '<i4')])
+    expected = np.array([(0, 0), (1, 1), (2, 2)], dtype=[('f0', '<i8'), ('f1', '<i8')])
     assert np.array_equal(merged, expected)
     assert merged.dtype == expected.dtype
     assert np.array_equal(merged['f0'], [0, 1, 2])

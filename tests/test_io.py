@@ -78,8 +78,8 @@ def test_write_read():
     assert root.hi.metadata.colour == 'red'
 
     assert root.dataset.dtype.base == [('timestamp', '<U19'), ('a', '<f8'), ('b', '<f8'), ('c', '<f8')]
-    assert root.hi.dtype.base == [('timestamp', '<U19'), ('x', '<i4'), ('y', '<i4')]
-    assert root.foo.bar.baz.dtype.base == [('timestamp', '<U26'), ('foo', '<f8'), ('bar', '<i4')]
+    assert root.hi.dtype.base == [('timestamp', '<U19'), ('x', '<i8'), ('y', '<i8')]
+    assert root.foo.bar.baz.dtype.base == [('timestamp', '<U26'), ('foo', '<f8'), ('bar', '<i8')]
 
     for item1, item2 in zip(root.dataset, [(1, 2, 3), (4, 5, 6), (7, 8, 9)]):
         datetime.fromisoformat(item1[0])  # converting to datetime object does not raise an error

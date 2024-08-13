@@ -175,8 +175,8 @@ def ave_std(data: np.ndarray,
     if data.size > 1:
         return np.average(data, axis=axis), np.std(data, axis=axis, ddof=1)
     if data.size == 1:
-        return data[0], np.NaN
-    return np.NaN, np.NaN
+        return data[0], np.nan
+    return np.nan, np.nan
 
 
 def get_decimals(value: int | float) -> int:
