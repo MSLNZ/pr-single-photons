@@ -5,6 +5,7 @@ on: [push, pull_request]
 env:
   PY_COLORS: 1
   COLUMNS: 110
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
 
 jobs:
   test:
@@ -20,9 +21,9 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.architecture }}
