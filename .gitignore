@@ -20,6 +20,8 @@ var/
 wheels/
 *.egg-info/
 .installed.cfg
+.venv/
+venv/
 
 # Sphinx documentation
 docs/_build/
